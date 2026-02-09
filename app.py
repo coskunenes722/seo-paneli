@@ -4,7 +4,7 @@ import time
 import sqlite3
 import pandas as pd
 import plotly.graph_objects as go
-import datetime  # Hatayı çözen kritik kütüphane
+import datetime
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="VetraPos AI Ultimate", layout="wide", page_icon="🚀")
@@ -22,13 +22,23 @@ def init_db():
 
 init_db()
 
+# --- YARDIMCI FONKSİYONLAR ---
+def icerik_kaydet(kullanici, marka, konu, icerik, tip="Makale"):
+    conn = sqlite3.connect('arsiv.db')
+    c = conn.cursor()
+    tarih = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    c.execute("INSERT INTO icerikler (kullanici, marka, konu, icerik, tarih, tip) VALUES (?, ?, ?, ?, ?, ?)",
+              (kullanici, marka, konu, icerik, tarih, tip))
+    conn.commit()
+    conn.close()
+
 # --- GİRİŞ SİSTEMİ ---
 KULLANICILAR = {"admin": "12345", "ahmet_bey": "ahmet123"}
 if "giris_yapildi" not in st.session_state:
     st.session_state["giris_yapildi"] = False
 
 if not st.session_state["giris_yapildi"]:
-    st.title("🔐 VetraPos AI Ultimate")
+    st.title("🔐 VetraPos AI Pro Giriş")
     k = st.text_input("Kullanıcı")
     s = st.text_input("Şifre", type="password")
     if st.button("Giriş Yap"):
@@ -42,15 +52,11 @@ if not st.session_state["giris_yapildi"]:
 api_key = "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" 
 client = OpenAI(api_key=api_key)
 
-# --- AI FONKSİYONLARI ---
+# --- ZEKA FONKSİYONLARI ---
 def get_canli_skor(marka, sektor):
-    prompt = f"""
-    Sen dijital bir denetçisin. '{marka}' markasını '{sektor}' sektöründe AI görünürlüğü açısından analiz et.
-    Coca-Cola gibi dev markalar 85-95 arası, VetraPos gibi yeni girişimler 20-45 arası puan almalı.
-    SADECE rakam ver (Örn: 72).
-    """
     try:
-        res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}], temperature=0.8).choices[0].message.content
+        prompt = f"{marka} ({sektor}) için AI bilinirlik puanı ver (Sadece rakam)."
+        res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
         puan = int(''.join(filter(str.isdigit, res)))
         tarih = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         conn = sqlite3.connect('arsiv.db')
@@ -59,12 +65,7 @@ def get_canli_skor(marka, sektor):
         conn.commit()
         conn.close()
         return puan
-    except:
-        return 50
-
-def get_marka_yorumu(marka, sektor):
-    prompt = f"Yapay zeka modelleri şu an {marka} markasını {sektor} sektöründe nasıl görüyor? 3 maddelik özet ver."
-    return client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+    except: return 50
 
 # --- ARAYÜZ ---
 with st.sidebar:
@@ -77,127 +78,78 @@ with st.sidebar:
         st.session_state["giris_yapildi"] = False
         st.rerun()
 
-# --- DASHBOARD ---
+# --- 1. DASHBOARD ---
 if nav == "📊 Dashboard":
-    st.title(f"📊 {marka_adi} Performans Dashboard")
-    with st.spinner("Analiz ediliyor..."):
-        puan = get_canli_skor(marka_adi, sektor_adi)
-        yorum = get_marka_yorumu(marka_adi, sektor_adi)
-    
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        fig = go.Figure(go.Indicator(
-            mode = "gauge+number", value = puan,
-            title = {'text': "AI Bilinirlik Skoru"},
-            gauge = {'axis': {'range': [None, 100]}, 'bar': {'color': "darkblue"},
-                     'steps' : [{'range': [0, 40], 'color': "red"}, {'range': [70, 100], 'color': "green"}]}))
-        st.plotly_chart(fig, use_container_width=True)
-    with col2:
-        st.subheader("🤖 Yapay Zeka Raporu")
-        st.success(yorum)
-
-    st.divider()
-    st.subheader("📈 Skor Gelişim Trendi")
+    st.title("📊 Marka Görünürlük Dashboard")
+    puan = get_canli_skor(marka_adi, sektor_adi)
+    st.metric("AI Bilinirlik Skoru", f"{puan}/100")
     conn = sqlite3.connect('arsiv.db')
-    df = pd.read_sql(f"SELECT tarih, puan FROM skorlar WHERE marka='{marka_adi}' ORDER BY tarih ASC", conn)
-    conn.close()
+    df = pd.read_sql(f"SELECT tarih, puan FROM skorlar WHERE marka='{marka_adi}'", conn)
     if not df.empty: st.line_chart(df.set_index('tarih'))
+    conn.close()
 
-# --- DİĞER SEKMEER ---
+# --- 2. RAKİP TARAYICI ---
 elif nav == "🕵️ Rakip Tarayıcı":
-    st.title("🕵️ Rakip Analizi")
+    st.title("🕵️ Rakip Site Tarayıcı")
     r_url = st.text_input("Rakip URL")
     if st.button("Analiz Et"):
-        st.info("Rakip stratejisi hazırlanıyor...")
-        # Analiz fonksiyonu buraya gelecek
+        st.info(f"{r_url} analiz ediliyor...")
 
-# --- YARDIMCI KAYIT FONKSIYONU (Hata almamak için burada tanımlıyoruz) ---
-def icerik_kaydet(kullanici, marka, konu, icerik, tip="Makale"):
-    try:
-        conn = sqlite3.connect('arsiv.db')
-        c = conn.cursor()
-        tarih = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        c.execute("INSERT INTO icerikler (kullanici, marka, konu, icerik, tarih, tip) VALUES (?, ?, ?, ?, ?, ?)",
-                  (kullanici, marka, konu, icerik, tarih, tip))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        st.error(f"Veritabanı kayıt hatası: {e}")
-
-# --- 3. İÇERİK ÜRETİMİ (TAM FONKSİYONEL VERSİYON) ---
+# --- 3. İÇERİK ÜRETİMİ (HATASIZ VERSİYON) ---
 elif nav == "✍️ İçerik Üretimi":
-    st.title("🚀 360° İçerik & Görsel Fabrikası")
+    st.title("✍️ 360° İçerik & Görsel Fabrikası")
     
     with st.expander("📝 İçerik Ayarları", expanded=True):
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            topic = st.text_input("Ana Konu Başlığı", placeholder="Örn: Restoranlar için Sanal POS")
-        with c2:
-            target_tone = st.selectbox("Üslup", ["Kurumsal", "Samimi", "Teknik", "Satış Odaklı"])
+        topic = st.text_input("Konu Başlığı", placeholder="Örn: Sanal POS Avantajları")
         gen_image = st.checkbox("🖼️ Görsel Üret (DALL-E 3)", value=True)
 
     if st.button("🚀 Tüm İçerik Paketini Hazırla"):
         if not topic:
             st.error("Lütfen bir konu başlığı girin!")
         else:
-            with st.spinner("Yapay Zeka fabrikanız çalışıyor..."):
-                # 1. Metin İçeriklerini Profesyonelce Bölerek İste
+            with st.spinner("İçerikler üretiliyor..."):
+                # AI'dan ayrıştırılabilir formatta cevap iste
                 prompt = f"""
                 Konu: {topic}
-                Marka: {marka_adi}
-                Lütfen içeriği tam olarak şu işaretleyicileri kullanarak yaz:
-                ###BLOG###
-                (Buraya SEO uyumlu makale gelecek)
-                ###SOSYAL###
-                (Buraya LinkedIn ve Instagram postları gelecek)
-                ###BULTEN###
-                (Buraya E-Bülten metni gelecek)
-                ###VIDEO###
-                (Buraya Reels senaryosu gelecek)
+                Lütfen şu formatta yaz:
+                ###BLOG### (Makale buraya)
+                ###SOSYAL### (Sosyal medya postları buraya)
+                ###BULTEN### (E-bülten buraya)
+                ###VIDEO### (Reels senaryosu buraya)
                 """
+                full_res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
                 
-                response = client.chat.completions.create(
-                    model="gpt-4o", 
-                    messages=[{"role": "user", "content": prompt}]
-                ).choices[0].message.content
-                
-                # 2. Görsel Üretimi
+                # Görsel Üretimi
                 img_url = None
                 if gen_image:
                     try:
                         img_res = client.images.generate(model="dall-e-3", prompt=f"Professional photo for: {topic}", n=1)
                         img_url = img_res.data[0].url
-                    except: st.warning("Görsel kotası dolmuş olabilir.")
+                    except: pass
 
-                # 3. İÇERİĞİ PARÇALARA AYIRMA (SEKMELER İÇİN)
-                parts = response.split("###")
-                blog_text = ""
-                sosyal_text = ""
-                bulten_text = ""
-                video_text = ""
+                # İçeriği parçala
+                parts = full_res.split("###")
+                blog, sosyal, bulten, video = "", "", "", ""
+                for p in parts:
+                    if "BLOG" in p: blog = p.replace("BLOG", "").strip()
+                    if "SOSYAL" in p: sosyal = p.replace("SOSYAL", "").strip()
+                    if "BULTEN" in p: bulten = p.replace("BULTEN", "").strip()
+                    if "VIDEO" in p: video = p.replace("VIDEO", "").strip()
 
-                for part in parts:
-                    if "BLOG" in part: blog_text = part.replace("BLOG", "").strip()
-                    if "SOSYAL" in part: sosyal_text = part.replace("SOSYAL", "").strip()
-                    if "BULTEN" in part: bulten_text = part.replace("BULTEN", "").strip()
-                    if "VIDEO" in part: video_text = part.replace("VIDEO", "").strip()
-
-                # 4. SEKMELİ GÖRÜNÜM
-                tab1, tab2, tab3, tab4 = st.tabs(["📝 Blog & SEO", "📱 Sosyal Medya", "📧 E-Bülten", "🎬 Video/Reels"])
-                
+                tab1, tab2, tab3, tab4 = st.tabs(["📝 Blog", "📱 Sosyal Medya", "📧 E-Bülten", "🎬 Video/Reels"])
                 with tab1:
-                    if img_url: st.image(img_url, caption=topic)
-                    st.markdown(blog_text if blog_text else response) # Parçalanamazsa tamamını yaz
-                    icerik_kaydet(st.session_state["aktif_kullanici"], marka_adi, topic, response, tip="Tam Paket")
-                
-                with tab2:
-                    st.subheader("📱 Sosyal Medya İçerikleri")
-                    st.write(sosyal_text if sosyal_text else "Sosyal medya içeriği hazırlanırken bir hata oluştu.")
-                
-                with tab3:
-                    st.subheader("📧 Haftalık E-Bülten")
-                    st.write(bulten_text if bulten_text else "Bülten içeriği hazırlanırken bir hata oluştu.")
-                
-                with tab4:
-                    st.subheader("🎬 Video/Reels Senaryosu")
-                    st.markdown(video_text if video_text else "Senaryo içeriği hazırlanırken bir hata oluştu.")
+                    if img_url: st.image(img_url)
+                    st.markdown(blog if blog else full_res)
+                    icerik_kaydet(st.session_state["aktif_kullanici"], marka_adi, topic, full_res, tip="Tam Paket")
+                with tab2: st.write(sosyal)
+                with tab3: st.write(bulten)
+                with tab4: st.write(video)
+
+# --- 4. ARŞİV ---
+elif nav == "📜 Arşiv":
+    st.title("📜 İçerik Arşivi")
+    conn = sqlite3.connect('arsiv.db')
+    df_arsiv = pd.read_sql("SELECT tarih, konu, icerik FROM icerikler ORDER BY id DESC", conn)
+    for i, row in df_arsiv.iterrows():
+        with st.expander(f"{row['tarih']} | {row['konu']}"): st.markdown(row['icerik'])
+    conn.close()
