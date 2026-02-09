@@ -3,25 +3,54 @@ import os
 from openai import OpenAI
 import datetime
 
-# --- BURASI KILIT KODU BASLANGICI ---
-sifre = "147258"  # Buraya istedigin sifreyi yaz (Musteriye bunu vereceksin)
+# --- PROFESYONEL GIRIS SISTEMI BASLANGICI ---
+import time # Eger yoksa bunu ekle (sayfa yenileme icin)
+
+# MUSTERI LISTESI (Buraya istedigin kadar kisi ekleyebilirsin)
+# Format: "Kullanici Adi": "Sifre"
+KULLANICILAR = {
+    "admin": "12345",          # Kendin icin
+    "ahmet_bey": "ahmet123",   # 1. Musteri
+    "guzellik_merkezi": "guzel2024", # 2. Musteri
+    "demo_hesap": "demo1"      # Deneme surumu vereceklerin icin
+}
 
 if "giris_yapildi" not in st.session_state:
     st.session_state["giris_yapildi"] = False
+    st.session_state["aktif_kullanici"] = ""
 
 if not st.session_state["giris_yapildi"]:
-    st.title("🔒 VetraPos SEO Paneli - Giriş")
-    girilen_sifre = st.text_input("Lütfen Şifreyi Giriniz:", type="password")
+    st.markdown("""
+    <style>
+    .stTextInput > label {font-size:105%; font-weight:bold; color:blue;} 
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.title("🔐 VetraPos SEO - Güvenli Giriş")
+    st.info("Lütfen size verilen kullanıcı adı ve şifre ile giriş yapın.")
+    
+    kullanici_adi = st.text_input("Kullanıcı Adı")
+    sifre = st.text_input("Şifre", type="password")
     
     if st.button("Giriş Yap"):
-        if girilen_sifre == sifre:
+        # Kullanici adi dogru mu ve sifre eslesiyor mu?
+        if kullanici_adi in KULLANICILAR and KULLANICILAR[kullanici_adi] == sifre:
             st.session_state["giris_yapildi"] = True
-            st.success("Giriş Başarılı! Yönlendiriliyorsunuz...")
+            st.session_state["aktif_kullanici"] = kullanici_adi
+            st.success(f"Hoşgeldiniz Sayın {kullanici_adi}! Panel Yükleniyor...")
+            time.sleep(1) # 1 saniye bekle
             st.rerun()
         else:
-            st.error("Hatalı şifre! Lütfen satın aldığınız şifreyi girin.")
-    st.stop()  # Sifre dogru degilse buradan sonrasi asla calismaz!
-# --- BURASI KILIT KODU BITISI ---
+            st.error("Hatalı kullanıcı adı veya şifre!")
+    
+    st.stop() # Giris yapilmazsa kodun devami calismaz
+else:
+    # Icerde kimin oldugunu gormek istersen (opsiyonel)
+    st.sidebar.success(f"👤 Giriş Yapan: {st.session_state['aktif_kullanici']}")
+    if st.sidebar.button("Çıkış Yap"):
+        st.session_state["giris_yapildi"] = False
+        st.rerun()
+# --- PROFESYONEL GIRIS SISTEMI BITISI ---
 
 # --- AYARLAR ---
 st.set_page_config(page_title="VetraPos AI SEO", layout="wide")
