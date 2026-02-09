@@ -26,7 +26,7 @@ if not st.session_state["giris_yapildi"]:
     </style>
     """, unsafe_allow_html=True)
     
-    st.title("🔐 VetraPos SEO - Güvenli Giriş")
+    st.title("🚀 Yapay Zeka SEO Paneli")
     st.info("Lütfen size verilen kullanıcı adı ve şifre ile giriş yapın.")
     
     kullanici_adi = st.text_input("Kullanıcı Adı")
