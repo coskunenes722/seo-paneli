@@ -3,10 +3,9 @@ from openai import OpenAI
 import time
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Yapay Zeka SEO Paneli", layout="wide")
+st.set_page_config(page_title="VetraPos AI SEO", layout="wide")
 
 # --- PROFESYONEL GIRIS SISTEMI ---
-# Kullanici Adi : Sifre
 KULLANICILAR = {
     "admin": "12345",
     "ahmet_bey": "ahmet123",
@@ -61,9 +60,17 @@ with st.sidebar:
     st.header("⚙️ Ayarlar")
     marka_adi = st.text_input("Marka Adı", value="")
     sektor = st.text_input("Sektör", value="")
+    
+    # YENI OZELLIK: Üslup Seçimi
+    uslup = st.selectbox(
+        "Marka Dili (Üslup)", 
+        ["Kurumsal ve Profesyonel", "Samimi ve Eğlenceli", "Bilimsel ve Teknik", "İkna Edici ve Satış Odaklı"]
+    )
+    
     st.info("Marka ve Sektör girmezseniz analiz çalışmaz.")
 
 # 3. YAPAY ZEKA FONKSIYONLARI
+
 def get_ai_suggestions(brand, sector):
     # 5 Konu + Anahtar Kelime + Rakip Analizi
     prompt = f"""
@@ -84,17 +91,14 @@ def get_ai_suggestions(brand, sector):
         return f"Hata: {e}"
 
 def get_ai_brand_awareness(brand, sector):
-    # Marka Karnesi (Bilinirlik Testi + Reçete)
+    # Marka Karnesi + Reçete
     prompt = f"""
     Sen bir Yapay Zeka Denetçisisin. "{brand}" markasını {sector} sektöründe analiz et.
-    
     Bana şu formatta samimi bir rapor ver:
-    
     1. **Bilinirlik Skoru:** (0 ile 100 arasında bir puan ver. Marka çok yeniyse düşük ver.)
     2. **Yapay Zeka Görüşü:** (ChatGPT olarak bu marka hakkında ne biliyorsun? Olumlu/Olumsuz/Nötr mü?)
     3. **Eksik Gedik:** (Genel olarak neler eksik?)
     4. **🚀 Puanı Yükseltecek 3 Altın Makale Konusu:** (Markanın bilinirliğini artırmak için hemen yazılması gereken, dikkat çekici 3 tam makale başlığı öner.)
-    
     Lütfen çıktılarını şık bir formatta, başlıklarla ayırarak ver.
     """
     try:
@@ -106,10 +110,12 @@ def get_ai_brand_awareness(brand, sector):
     except Exception as e:
         return f"Hata: {e}"
 
-def write_full_article(topic, brand):
-    # Makale Yazari
+def write_full_article(topic, brand, tone):
+    # Makale Yazari (Üslup destekli)
     prompt = f"""
     Konu: {topic}. Marka: {brand}. 
+    Dil ve Üslup: {tone} bir dille yazılacak.
+    
     600 kelimelik, SEO uyumlu, teknik bir blog yazısı yaz.
     - İçinde mutlaka bir HTML tablosu olsun.
     - Alt başlıklar (h2, h3) kullan.
@@ -119,7 +125,7 @@ def write_full_article(topic, brand):
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": f"Sen {brand} markası için çalışan profesyonel bir içerik yazarısın."},
+                {"role": "system", "content": f"Sen {brand} markası için {tone} içerik üreten profesyonel bir yazarsın."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -127,8 +133,27 @@ def write_full_article(topic, brand):
     except Exception as e:
         return f"Hata: {e}"
 
+def write_social_media_posts(topic, brand, tone):
+    # Yeni Özellik: Sosyal Medya Paketi
+    prompt = f"""
+    Konu: "{topic}". Marka: {brand}. Üslup: {tone}.
+    Bu blog yazısını tanıtmak için 3 farklı platforma içerik hazırla:
+    1. **LinkedIn Gönderisi:** (Profesyonel, emojili, hashtag'li)
+    2. **Instagram Açıklaması:** (Samimi, harekete geçirici, bol hashtag'li)
+    3. **Twitter (X) Flood:** (3 tweetlik kısa, vurucu bir seri)
+    Hepsini başlıklarla ayır.
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Hata: {e}"
+
 # 4. ANA SAYFA TASARIMI
-st.title("🚀 Yapay Zeka SEO Paneli")
+st.title("🚀 Yapay Zeka SEO & Sosyal Medya Paneli")
 
 col1, col2 = st.columns([1,1])
 
@@ -140,14 +165,14 @@ with col1:
         if not marka_adi or not sektor:
             st.error("Lütfen önce sol menüden Marka ve Sektör girin!")
         else:
-            with st.spinner("Rakipler inceleniyor, kelimeler bulunuyor..."):
+            with st.spinner("Rakipler inceleniyor..."):
                 sonuc = get_ai_suggestions(marka_adi, sektor)
                 st.markdown(sonuc)
                 st.success("Analiz tamamlandı!")
 
     st.markdown("---") 
 
-    # Buton 2: Marka Karnesi (Yeni Özellik)
+    # Buton 2: Marka Karnesi
     if st.button("🤖 AI Marka Karnesini Çıkar"):
         if not marka_adi or not sektor:
             st.error("Lütfen marka ve sektör girin!")
@@ -156,19 +181,30 @@ with col1:
                 karne = get_ai_brand_awareness(marka_adi, sektor)
                 st.info("### 📢 Yapay Zeka Gözünde Markanız")
                 st.write(karne)
-                st.warning("Puanınız düşükse, yandaki panelden makale yazdırarak yapay zekayı eğitebilirsiniz!")
+                st.warning("Aşağıdaki 'Altın Konuları' kopyalayıp yandaki panele yapıştırın! 👉")
 
 with col2:
-    st.success("✍️ **2. Adım: Makale Yaz**")
+    st.success("✍️ **2. Adım: İçerik Üretimi**")
     topic_input = st.text_area("Hangi konuyu yazalım?", placeholder="Soldaki analizden bir başlık kopyalayıp buraya yapıştırın...")
     
-    if st.button("Makaleyi Yaz"):
+    # Butonlari yan yana koyalim
+    b1, b2 = st.columns([1,1])
+    
+    if b1.button("Makaleyi Yaz"):
         if not topic_input or len(topic_input) < 5:
-            st.warning("Lütfen geçerli bir konu başlığı girin.")
+            st.warning("Konu giriniz.")
         else:
-            with st.spinner("Makale yazılıyor, lütfen bekleyin..."):
-                if not marka_adi:
-                    marka_adi = "Genel"
-                article = write_full_article(topic_input, marka_adi)
+            with st.spinner("Makale yazılıyor..."):
+                if not marka_adi: marka_adi = "Genel"
+                article = write_full_article(topic_input, marka_adi, uslup)
                 st.markdown(article)
                 st.download_button("💾 Makaleyi İndir", article, file_name="seo-makale.md")
+
+    if b2.button("Sosyal Medya Paketi"):
+        if not topic_input or len(topic_input) < 5:
+            st.warning("Önce bir konu giriniz.")
+        else:
+            with st.spinner("Postlar hazırlanıyor..."):
+                posts = write_social_media_posts(topic_input, marka_adi, uslup)
+                st.info("### 📱 Sosyal Medya İçerikleri")
+                st.write(posts)
