@@ -24,7 +24,7 @@ init_db()
 
 # --- 3. API YAPILANDIRMASI ---
 # DİKKAT: Anahtarı tek satırda ve tırnakları kapatarak yazın!
-OPENAI_KEY = "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" 
+OPENAI_KEY = "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" 
 client = OpenAI(api_key=OPENAI_KEY)
 
 # --- 4. ZEKA FONKSİYONLARI ---
