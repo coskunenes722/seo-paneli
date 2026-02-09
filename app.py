@@ -52,16 +52,29 @@ except:
     st.error("API Key hatası! Lütfen kodun 37. satırına şifrenizi doğru yapıştırdığınızdan emin olun.")
     st.stop()
 
-# --- YARDIMCI FONKSIYONLAR ---
+# --- YARDIMCI FONKSIYONLAR (PDF VE WP) ---
+
 def clean_text_for_pdf(text):
-    # FPDF basit fontlari Turkce karakterleri bazen bozar, onlari duzeltiyoruz
+    # --- PDF HATALARINI ONLEYEN TEMIZLIK ROBOTU ---
+    # 1. GPT'nin kullandığı süslü/kıvrık tırnakları düzeltiyoruz (Bu kısım hatayı çözer)
     replacements = {
-        "ğ": "g", "Ğ": "G", "ü": "u", "Ü": "U", "ş": "s", "Ş": "S", 
-        "ı": "i", "İ": "I", "ö": "o", "Ö": "O", "ç": "c", "Ç": "C"
+        "’": "'", "‘": "'", "“": '"', "”": '"', "–": "-", "—": "-", "…": "..."
     }
-    for search, replace in replacements.items():
-        text = text.replace(search, replace)
-    return text
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+
+    # 2. Türkçe karakterleri PDF'in anlayacağı "Güvenli Latin" formatına zorluyoruz.
+    # FPDF standart fontu Türkçe karakterleri (ğ, ş, ı) desteklemez ve bozuk çıkarır.
+    # O yüzden bunları en yakın harfe (g, s, i) çeviriyoruz ki PDF ÇÖKMESİN.
+    tr_map = {
+        "ğ": "g", "Ğ": "G", "ş": "s", "Ş": "S", "ı": "i", "İ": "I",
+        "ö": "o", "Ö": "O", "ç": "c", "Ç": "C", "ü": "u", "Ü": "U"
+    }
+    for k, v in tr_map.items():
+        text = text.replace(k, v)
+    
+    # 3. Son güvenlik önlemi: Tanınmayan her şeyi sil (Latin-1'e zorla)
+    return text.encode('latin-1', 'ignore').decode('latin-1')
 
 def create_pdf_report(content, filename="rapor.pdf"):
     pdf = FPDF()
@@ -72,7 +85,7 @@ def create_pdf_report(content, filename="rapor.pdf"):
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(200, 10, txt="VetraPos AI SEO Raporu", ln=1, align='C')
     
-    # Icerik
+    # Icerik (Temizlenmis metin ile)
     pdf.set_font("Arial", size=10)
     clean_content = clean_text_for_pdf(content)
     pdf.multi_cell(0, 10, txt=clean_content)
@@ -209,7 +222,7 @@ with col1:
             with st.spinner("Analiz..."):
                 res = get_ai_suggestions(marka_adi, sektor)
                 st.markdown(res)
-                # PDF İndirme Butonu
+                # PDF İndirme Butonu (HATA BURADA DUZELTILDI)
                 pdf_bytes = create_pdf_report(res)
                 st.download_button("📄 PDF Raporu İndir", pdf_bytes, "analiz_raporu.pdf", "application/pdf")
         else: st.warning("Marka girin.")
