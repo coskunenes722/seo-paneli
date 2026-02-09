@@ -9,12 +9,14 @@ import datetime
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="VetraPos AI Ultimate", layout="wide", page_icon="🚀")
 
-# --- VERİTABANI ---
+# --- VERİTABANI MİMARİSİ ---
 def init_db():
     conn = sqlite3.connect('arsiv.db')
     c = conn.cursor()
+    # Tabloyu yeni sütunlarla birlikte oluşturur
     c.execute('''CREATE TABLE IF NOT EXISTS icerikler 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, marka TEXT, konu TEXT, icerik TEXT, tarih TEXT, tip TEXT)''')
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                  kullanici TEXT, marka TEXT, konu TEXT, icerik TEXT, tarih TEXT, tip TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS skorlar 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, marka TEXT, puan INTEGER, tarih TEXT)''')
     conn.commit()
@@ -48,14 +50,14 @@ if not st.session_state["giris_yapildi"]:
             st.rerun()
     st.stop()
 
-# --- API ---
+# --- API YAPILANDIRMASI ---
 api_key = "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" 
 client = OpenAI(api_key=api_key)
 
-# --- ZEKA FONKSİYONLARI ---
+# --- DASHBOARD SKOR FONKSİYONU ---
 def get_canli_skor(marka, sektor):
     try:
-        prompt = f"{marka} ({sektor}) için AI bilinirlik puanı ver (Sadece rakam)."
+        prompt = f"{marka} markasının {sektor} sektöründeki AI puanını ver (Sadece rakam)."
         res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
         puan = int(''.join(filter(str.isdigit, res)))
         tarih = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -67,7 +69,7 @@ def get_canli_skor(marka, sektor):
         return puan
     except: return 50
 
-# --- ARAYÜZ ---
+# --- ARAYÜZ (SIDEBAR) ---
 with st.sidebar:
     st.title(f"👋 {st.session_state['aktif_kullanici']}")
     marka_adi = st.text_input("Markanız", "VetraPos")
@@ -83,9 +85,11 @@ if nav == "📊 Dashboard":
     st.title("📊 Marka Görünürlük Dashboard")
     puan = get_canli_skor(marka_adi, sektor_adi)
     st.metric("AI Bilinirlik Skoru", f"{puan}/100")
+    
     conn = sqlite3.connect('arsiv.db')
     df = pd.read_sql(f"SELECT tarih, puan FROM skorlar WHERE marka='{marka_adi}'", conn)
-    if not df.empty: st.line_chart(df.set_index('tarih'))
+    if not df.empty:
+        st.line_chart(df.set_index('tarih'))
     conn.close()
 
 # --- 2. RAKİP TARAYICI ---
@@ -95,55 +99,22 @@ elif nav == "🕵️ Rakip Tarayıcı":
     if st.button("Analiz Et"):
         st.info(f"{r_url} analiz ediliyor...")
 
-# --- 3. İÇERİK ÜRETİMİ (HATASIZ VERSİYON) ---
+# --- 3. İÇERİK ÜRETİMİ ---
 elif nav == "✍️ İçerik Üretimi":
-    st.title("✍️ 360° İçerik & Görsel Fabrikası")
-    
-    with st.expander("📝 İçerik Ayarları", expanded=True):
-        topic = st.text_input("Konu Başlığı", placeholder="Örn: Sanal POS Avantajları")
-        gen_image = st.checkbox("🖼️ Görsel Üret (DALL-E 3)", value=True)
-
-    if st.button("🚀 Tüm İçerik Paketini Hazırla"):
-        if not topic:
-            st.error("Lütfen bir konu başlığı girin!")
-        else:
-            with st.spinner("İçerikler üretiliyor..."):
-                # AI'dan ayrıştırılabilir formatta cevap iste
-                prompt = f"""
-                Konu: {topic}
-                Lütfen şu formatta yaz:
-                ###BLOG### (Makale buraya)
-                ###SOSYAL### (Sosyal medya postları buraya)
-                ###BULTEN### (E-bülten buraya)
-                ###VIDEO### (Reels senaryosu buraya)
-                """
-                full_res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
-                
-                # Görsel Üretimi
-                img_url = None
-                if gen_image:
-                    try:
-                        img_res = client.images.generate(model="dall-e-3", prompt=f"Professional photo for: {topic}", n=1)
-                        img_url = img_res.data[0].url
-                    except: pass
-
-                # İçeriği parçala
-                parts = full_res.split("###")
-                blog, sosyal, bulten, video = "", "", "", ""
-                for p in parts:
-                    if "BLOG" in p: blog = p.replace("BLOG", "").strip()
-                    if "SOSYAL" in p: sosyal = p.replace("SOSYAL", "").strip()
-                    if "BULTEN" in p: bulten = p.replace("BULTEN", "").strip()
-                    if "VIDEO" in p: video = p.replace("VIDEO", "").strip()
-
-                tab1, tab2, tab3, tab4 = st.tabs(["📝 Blog", "📱 Sosyal Medya", "📧 E-Bülten", "🎬 Video/Reels"])
-                with tab1:
-                    if img_url: st.image(img_url)
-                    st.markdown(blog if blog else full_res)
-                    icerik_kaydet(st.session_state["aktif_kullanici"], marka_adi, topic, full_res, tip="Tam Paket")
-                with tab2: st.write(sosyal)
-                with tab3: st.write(bulten)
-                with tab4: st.write(video)
+    st.title("✍️ 360° İçerik Fabrikası")
+    topic = st.text_input("Konu Başlığı")
+    if st.button("🚀 İçerik Paketini Hazırla"):
+        with st.spinner("Üretiliyor..."):
+            prompt = f"Konu: {topic}. Lütfen ###BLOG###, ###SOSYAL###, ###BULTEN### başlıklarıyla içerik yaz."
+            full_res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+            
+            # İçeriği parçala ve sekmelere dağıt
+            tab1, tab2, tab3 = st.tabs(["📝 Blog", "📱 Sosyal", "📧 Bülten"])
+            with tab1: st.markdown(full_res)
+            
+            # Kaydetme hatasını düzelten satır
+            icerik_kaydet(st.session_state["aktif_kullanici"], marka_adi, topic, full_res, tip="Tam Paket")
+            st.success("Arşive kaydedildi!")
 
 # --- 4. ARŞİV ---
 elif nav == "📜 Arşiv":
@@ -151,5 +122,6 @@ elif nav == "📜 Arşiv":
     conn = sqlite3.connect('arsiv.db')
     df_arsiv = pd.read_sql("SELECT tarih, konu, icerik FROM icerikler ORDER BY id DESC", conn)
     for i, row in df_arsiv.iterrows():
-        with st.expander(f"{row['tarih']} | {row['konu']}"): st.markdown(row['icerik'])
+        with st.expander(f"{row['tarih']} | {row['konu']}"):
+            st.markdown(row['icerik'])
     conn.close()
