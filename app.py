@@ -88,7 +88,7 @@ def write_full_article(topic, brand):
         return f"Hata: {e}"
 
 # --- EKRAN TASARIMI ---
-st.title("🚀 VetraPos - Yapay Zeka SEO Paneli")
+st.title("🚀 Yapay Zeka SEO Paneli")
 
 # Sol Menü
 st.sidebar.header("⚙️ Ayarlar")
