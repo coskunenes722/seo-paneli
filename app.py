@@ -111,55 +111,93 @@ elif nav == "🕵️ Rakip Tarayıcı":
         st.info("Rakip stratejisi hazırlanıyor...")
         # Analiz fonksiyonu buraya gelecek
 
-# --- 3. İÇERİK FABRİKASI (GÖRSEL VE SEKME DESTEKLİ - TAM SÜRÜM) ---
+# --- YARDIMCI KAYIT FONKSIYONU (Hata almamak için burada tanımlıyoruz) ---
+def icerik_kaydet(kullanici, marka, konu, icerik, tip="Makale"):
+    try:
+        conn = sqlite3.connect('arsiv.db')
+        c = conn.cursor()
+        tarih = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        c.execute("INSERT INTO icerikler (kullanici, marka, konu, icerik, tarih, tip) VALUES (?, ?, ?, ?, ?, ?)",
+                  (kullanici, marka, konu, icerik, tarih, tip))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Veritabanı kayıt hatası: {e}")
+
+# --- 3. İÇERİK ÜRETİMİ (TAM FONKSİYONEL VERSİYON) ---
 elif nav == "✍️ İçerik Üretimi":
-    st.title("✍️ 360° İçerik & Görsel Fabrikası")
+    st.title("🚀 360° İçerik & Görsel Fabrikası")
     
-    # Giriş Alanları
     with st.expander("📝 İçerik Ayarları", expanded=True):
         c1, c2 = st.columns([2, 1])
         with c1:
-            topic = st.text_input("Ana Konu Başlığı", placeholder="Örn: Sanal POS Kurulum Rehberi")
+            topic = st.text_input("Ana Konu Başlığı", placeholder="Örn: Restoranlar için Sanal POS")
         with c2:
             target_tone = st.selectbox("Üslup", ["Kurumsal", "Samimi", "Teknik", "Satış Odaklı"])
-        
-        gen_image = st.checkbox("🖼️ Her Sekme İçin Görsel Üret (DALL-E 3)", value=True)
+        gen_image = st.checkbox("🖼️ Görsel Üret (DALL-E 3)", value=True)
 
     if st.button("🚀 Tüm İçerik Paketini Hazırla"):
         if not topic:
             st.error("Lütfen bir konu başlığı girin!")
         else:
             with st.spinner("Yapay Zeka fabrikanız çalışıyor..."):
-                # 1. Metin İçeriklerini Üret
-                prompt = f"{topic} konusunda {marka_adi} için SEO blog, Sosyal Medya (LinkedIn, X, IG), Bülten ve Reels senaryosu yaz."
-                res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+                # 1. Metin İçeriklerini Profesyonelce Bölerek İste
+                prompt = f"""
+                Konu: {topic}
+                Marka: {marka_adi}
+                Lütfen içeriği tam olarak şu işaretleyicileri kullanarak yaz:
+                ###BLOG###
+                (Buraya SEO uyumlu makale gelecek)
+                ###SOSYAL###
+                (Buraya LinkedIn ve Instagram postları gelecek)
+                ###BULTEN###
+                (Buraya E-Bülten metni gelecek)
+                ###VIDEO###
+                (Buraya Reels senaryosu gelecek)
+                """
                 
-                # 2. Görsel Üret (İşaretlendiyse)
+                response = client.chat.completions.create(
+                    model="gpt-4o", 
+                    messages=[{"role": "user", "content": prompt}]
+                ).choices[0].message.content
+                
+                # 2. Görsel Üretimi
                 img_url = None
                 if gen_image:
                     try:
-                        img_res = client.images.generate(model="dall-e-3", prompt=f"Professional digital art for: {topic}", n=1)
+                        img_res = client.images.generate(model="dall-e-3", prompt=f"Professional photo for: {topic}", n=1)
                         img_url = img_res.data[0].url
-                    except: st.warning("Görsel üretiminde limitlere takınıldı.")
+                    except: st.warning("Görsel kotası dolmuş olabilir.")
 
-                # 3. Sekmeli Görünüm (Ekranda gözükmesini sağlayan kısım)
+                # 3. İÇERİĞİ PARÇALARA AYIRMA (SEKMELER İÇİN)
+                parts = response.split("###")
+                blog_text = ""
+                sosyal_text = ""
+                bulten_text = ""
+                video_text = ""
+
+                for part in parts:
+                    if "BLOG" in part: blog_text = part.replace("BLOG", "").strip()
+                    if "SOSYAL" in part: sosyal_text = part.replace("SOSYAL", "").strip()
+                    if "BULTEN" in part: bulten_text = part.replace("BULTEN", "").strip()
+                    if "VIDEO" in part: video_text = part.replace("VIDEO", "").strip()
+
+                # 4. SEKMELİ GÖRÜNÜM
                 tab1, tab2, tab3, tab4 = st.tabs(["📝 Blog & SEO", "📱 Sosyal Medya", "📧 E-Bülten", "🎬 Video/Reels"])
                 
                 with tab1:
-                    st.subheader("📄 Blog Makalesi")
-                    if img_url: st.image(img_url, caption="Blog Kapak Görseli")
-                    st.markdown(res)
-                    icerik_kaydet(st.session_state["aktif_kullanici"], marka_adi, topic, res, tip="Blog")
-
+                    if img_url: st.image(img_url, caption=topic)
+                    st.markdown(blog_text if blog_text else response) # Parçalanamazsa tamamını yaz
+                    icerik_kaydet(st.session_state["aktif_kullanici"], marka_adi, topic, response, tip="Tam Paket")
+                
                 with tab2:
-                    st.subheader("📱 Sosyal Medya Postları")
-                    if img_url: st.image(img_url, width=400)
-                    st.info("LinkedIn, Instagram ve X içerikleriniz yukarıdaki metin içinde yer almaktadır.")
-
+                    st.subheader("📱 Sosyal Medya İçerikleri")
+                    st.write(sosyal_text if sosyal_text else "Sosyal medya içeriği hazırlanırken bir hata oluştu.")
+                
                 with tab3:
                     st.subheader("📧 Haftalık E-Bülten")
-                    st.write(f"Sayın abonelerimiz, bu haftaki konumuz: {topic}...")
-
+                    st.write(bulten_text if bulten_text else "Bülten içeriği hazırlanırken bir hata oluştu.")
+                
                 with tab4:
-                    st.subheader("🎬 Reels Senaryosu")
-                    st.success("Senaryonuz hazır! Kayda başlayabilirsiniz.")
+                    st.subheader("🎬 Video/Reels Senaryosu")
+                    st.markdown(video_text if video_text else "Senaryo içeriği hazırlanırken bir hata oluştu.")
