@@ -64,9 +64,20 @@ api_key = "sk-proj-gLGJlKlOrRwGoAN6ngKzFbk-fA9V2T2OMRIHldNSlqZ0KObbZTJUEyLwAw2hk
 
 client = OpenAI(api_key=api_key)
 
-# --- FONKSİYONLAR ---
+# --- YENI GELISMIS FONKSIYONLAR ---
 def get_ai_suggestions(brand, sector):
-    prompt = f"Sen {brand} markası için {sector} sektöründe 3 teknik blog konusu öner."
+    # 3 degil, artik 5 konu oneriyoruz ve daha detayli istiyoruz
+    prompt = f"""
+    Sen {brand} markası için {sector} sektöründe uzman bir SEO stratejistisin.
+    
+    Lütfen şu 3 başlık altında detaylı bir analiz yap:
+    
+    1. **5 Adet Teknik Blog Konusu:** {brand} markasının otoritesini artıracak, az bilinen ama çok aranan 5 teknik konu öner.
+    2. **Anahtar Kelime Analizi:** {sector} sektörü için hacmi yüksek ama rekabeti düşük 10 adet "Long-tail" (uzun kuyruklu) anahtar kelime öner.
+    3. **Rakip Analizi:** {sector} sektöründeki rakiplerin genellikle neleri eksik yaptığını ve {brand} markasının nasıl öne çıkabileceğini anlatan 3 maddelik strateji ver.
+    
+    Lütfen çıktılarını şık bir formatta, başlıklarla ayırarak ver.
+    """
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -77,7 +88,8 @@ def get_ai_suggestions(brand, sector):
         return f"Hata: {e}"
 
 def write_full_article(topic, brand):
-    prompt = f"Konu: {topic}. Marka: {brand}. 600 kelimelik teknik, tablolu, Schema kodlu makale yaz."
+    # Makale yazma kismi ayni kalsin, guzel calisiyor
+    prompt = f"Konu: {topic}. Marka: {brand}. 600 kelimelik teknik, tablolu, Schema kodlu, SEO uyumlu makale yaz."
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -85,9 +97,7 @@ def write_full_article(topic, brand):
         )
         return response.choices[0].message.content
     except Exception as e:
-        return f"Hata: {e}"
-
-# --- EKRAN TASARIMI ---
+        return f"Hata: {e}"# --- EKRAN TASARIMI ---
 st.title("🚀 Yapay Zeka SEO Paneli")
 
 # Sol Menü
@@ -101,11 +111,20 @@ col1, col2 = st.columns(2)
 with col1:
     st.info("🕵️‍♂️ **1. Adım: Konu Bul**")
     if st.button("Fikir Üret"):
-        with st.spinner("Düşünülüyor..."):
-            suggestions = get_ai_suggestions(brand_name, sector_name)
-            st.success("Öneriler:")
-            st.write(suggestions)
-
+        # --- YENI BUTON KODU ---
+if st.button("🚀 Detaylı SEO Analizi Yap"):
+    if not marka_adi or not sektor:
+        st.error("Lütfen marka ve sektör bilgisini girin!")
+    else:
+        with st.spinner(f"{marka_adi} için rakipler analiz ediliyor, anahtar kelimeler bulunuyor..."):
+            # Yeni fonksiyonu cagiriyoruz
+            sonuc = get_ai_suggestions(marka_adi, sektor)
+            
+            # Sonuclari ekrana yazdiriyoruz
+            st.markdown("### 📊 Yapay Zeka SEO Raporu")
+            st.write(sonuc)
+            
+            st.success("Analiz tamamlandı! Şimdi aşağıdan bir konu seçip makale yazdırabilirsin.")
 with col2:
     st.success("✍️ **2. Adım: Makale Yaz**")
     topic_input = st.text_area("Hangi konuyu yazalım?", placeholder="Soldan bir başlık kopyala...")
