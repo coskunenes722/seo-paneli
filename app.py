@@ -84,14 +84,18 @@ def get_ai_suggestions(brand, sector):
         return f"Hata: {e}"
 
 def get_ai_brand_awareness(brand, sector):
-    # Marka Karnesi (Bilinirlik Testi)
+    # Marka Karnesi (Bilinirlik Testi + Reçete)
     prompt = f"""
     Sen bir Yapay Zeka Denetçisisin. "{brand}" markasını {sector} sektöründe analiz et.
-    Bana şu formatta kısa bir rapor ver:
-    1. **Bilinirlik Skoru:** (0 ile 100 arasında bir puan ver. Eğer marka çok yeniyse düşük ver.)
+    
+    Bana şu formatta samimi bir rapor ver:
+    
+    1. **Bilinirlik Skoru:** (0 ile 100 arasında bir puan ver. Marka çok yeniyse düşük ver.)
     2. **Yapay Zeka Görüşü:** (ChatGPT olarak bu marka hakkında ne biliyorsun? Olumlu/Olumsuz/Nötr mü?)
-    3. **Eksik Gedik:** (Bu markanın yapay zekada daha iyi tanınması için hangi konularda içerik üretmesi lazım?)
-    Lütfen samimi ve gerçekçi ol.
+    3. **Eksik Gedik:** (Genel olarak neler eksik?)
+    4. **🚀 Puanı Yükseltecek 3 Altın Makale Konusu:** (Markanın bilinirliğini artırmak için hemen yazılması gereken, dikkat çekici 3 tam makale başlığı öner.)
+    
+    Lütfen çıktılarını şık bir formatta, başlıklarla ayırarak ver.
     """
     try:
         response = client.chat.completions.create(
