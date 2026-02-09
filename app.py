@@ -212,8 +212,8 @@ with col2:
     st.success("✍️ **2. Adım: İçerik Üretimi**")
     topic_input = st.text_area("Hangi konuyu yazalım?", placeholder="Soldaki analizden bir başlık kopyalayıp buraya yapıştırın...")
     
-   # 3 butonu yan yana diziyoruz
-    b1, b2, b3 = st.columns([1,1,1])
+  # 4 butonu yan yana diziyoruz (Makale, Sosyal, Mail, SEO Künye)
+    b1, b2, b3, b4 = st.columns([1,1,1,1])
     
     if b1.button("Makaleyi Yaz"):
         if not topic_input or len(topic_input) < 5:
@@ -225,7 +225,7 @@ with col2:
                 st.markdown(article)
                 st.download_button("💾 Makaleyi İndir", article, file_name="seo-makale.md")
 
-    if b2.button("Sosyal Medya Paketi"):
+    if b2.button("Sosyal Medya"):
         if not topic_input or len(topic_input) < 5:
             st.warning("Önce bir konu giriniz.")
         else:
@@ -234,7 +234,7 @@ with col2:
                 st.info("### 📱 Sosyal Medya İçerikleri")
                 st.write(posts)
 
-    if b3.button("📧 E-Bülten Hazırla"):
+    if b3.button("E-Bülten"):
         if not topic_input or len(topic_input) < 5:
             st.warning("Önce bir konu giriniz.")
         else:
@@ -242,3 +242,34 @@ with col2:
                 newsletter = write_newsletter(topic_input, marka_adi, uslup)
                 st.success("### 📧 E-Bülten Taslağı")
                 st.write(newsletter)
+
+    if b4.button("🏷️ SEO Künyesi"):
+        if not topic_input or len(topic_input) < 5:
+            st.warning("Önce bir konu giriniz.")
+        else:
+            with st.spinner("Meta etiketleri hazırlanıyor..."):
+                tags = generate_seo_tags(topic_input, marka_adi)
+                st.warning("### 🏷️ Teknik SEO Ayarları")
+                st.write(tags)
+def generate_seo_tags(topic, brand):
+    # Yeni Özellik: Teknik SEO Künyesi
+    prompt = f"""
+    Konu: "{topic}". Marka: {brand}.
+    
+    Bu blog yazısı için Google'ın seveceği teknik SEO etiketlerini hazırla.
+    
+    Format Şöyle Olsun:
+    1. **SEO Başlığı (Title):** (Maksimum 60 karakter, ilgi çekici ve anahtar kelime odaklı).
+    2. **Meta Açıklaması (Description):** (Maksimum 160 karakter, tıklamaya teşvik eden özet).
+    3. **SEO Dostu URL (Slug):** (Türkçe karakter içermeyen, kısa, tire ile ayrılmış link yapısı).
+    4. **Görsel Alt Etiketi (Alt Text):** (Görseli tarif eden anahtar kelimeli cümle).
+    5. **Odak Anahtar Kelime:** (Yazının hedeflediği ana kelime).
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Hata: {e}"
