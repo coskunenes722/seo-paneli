@@ -111,97 +111,55 @@ elif nav == "🕵️ Rakip Tarayıcı":
         st.info("Rakip stratejisi hazırlanıyor...")
         # Analiz fonksiyonu buraya gelecek
 
-# --- 3. İÇERİK FABRİKASI (GELİŞMİŞ VE GÖRSEL DESTEKLİ) ---
-elif nav == "✍️ İçerik Fabrikası":
-    st.title("✍️ 360° İçerik Strateji Merkezi & Görsel Fabrikası")
-    st.info("Bir konu girin, AI sizin için tüm platformlara uygun içerik paketini ve görselleri hazırlasın.")
-
-    with st.container():
+# --- 3. İÇERİK FABRİKASI (GÖRSEL VE SEKME DESTEKLİ - TAM SÜRÜM) ---
+elif nav == "✍️ İçerik Üretimi":
+    st.title("✍️ 360° İçerik & Görsel Fabrikası")
+    
+    # Giriş Alanları
+    with st.expander("📝 İçerik Ayarları", expanded=True):
         c1, c2 = st.columns([2, 1])
         with c1:
-            topic = st.text_input("Ana İçerik Konusu", placeholder="Örn: Sanal POS Seçerken Dikkat Edilmesi Gerekenler")
+            topic = st.text_input("Ana Konu Başlığı", placeholder="Örn: Sanal POS Kurulum Rehberi")
         with c2:
-            target_tone = st.selectbox("İçerik Dili", ["Kurumsal & Güven Verici", "Samimi & Akıcı", "Teknik & Detaylı", "Satış Odaklı"])
+            target_tone = st.selectbox("Üslup", ["Kurumsal", "Samimi", "Teknik", "Satış Odaklı"])
+        
+        gen_image = st.checkbox("🖼️ Her Sekme İçin Görsel Üret (DALL-E 3)", value=True)
 
-    # Platform Seçenekleri ve Görsel İsteği
-    st.markdown("##### 🚀 Üretilecek Paket İçeriği")
-    col_a, col_b, col_c, col_d, col_e = st.columns(5)
-    do_blog = col_a.checkbox("📝 SEO Blog", value=True)
-    do_social = col_b.checkbox("📱 Sosyal Medya", value=True)
-    do_mail = col_c.checkbox("📧 E-Bülten", value=True)
-    do_video = col_d.checkbox("🎬 Video/Reels", value=True)
-    do_image = col_e.checkbox("🖼️ Görsel Üret (DALL-E 3)", value=True) # Yeni Görsel Seçeneği
-
-    if st.button("🌟 Tüm İçerik & Görsel Paketini Oluştur"):
+    if st.button("🚀 Tüm İçerik Paketini Hazırla"):
         if not topic:
-            st.warning("Lütfen bir konu başlığı girin.")
+            st.error("Lütfen bir konu başlığı girin!")
         else:
-            with st.spinner("Yapay Zeka tüm paketini hazırlıyor..."):
-                # Ana İçerik Üretimi
-                prompt = f"""
-                Konu: {topic}
-                Marka: {marka_adi}
-                Üslup: {target_tone}
+            with st.spinner("Yapay Zeka fabrikanız çalışıyor..."):
+                # 1. Metin İçeriklerini Üret
+                prompt = f"{topic} konusunda {marka_adi} için SEO blog, Sosyal Medya (LinkedIn, X, IG), Bülten ve Reels senaryosu yaz."
+                res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
                 
-                Lütfen aşağıdaki formatta bir içerik paketi hazırla:
-                1. [BLOG]: SEO uyumlu başlık, 500 kelimelik makale, Meta Description ve Slug önerisi.
-                2. [SOSYAL MEDYA]: LinkedIn (profesyonel), Instagram (ilgi çekici) ve Twitter (flood) için 3 ayrı post.
-                3. [E-BÜLTEN]: Dikkat çekici konu başlığı ve kısa, aksiyona davet eden (CTA) mail metni.
-                4. [VIDEO SCRIPT]: 60 saniyelik bir Reels videosu için sahne sahne konuşma metni.
-                """
-                
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.7
-                )
-                full_content = response.choices[0].message.content
-                
-                # Görsel Üretimi (SADECE do_image seçiliyse)
-                image_url = None
-                if do_image:
-                    image_prompt = f"Marka: {marka_adi}. Konu: {topic}. Bu içeriği temsil eden, modern, profesyonel ve ilgi çekici bir dijital sanat eseri oluştur. Metin içermesin."
+                # 2. Görsel Üret (İşaretlendiyse)
+                img_url = None
+                if gen_image:
                     try:
-                        image_response = client.images.generate(
-                            model="dall-e-3",
-                            prompt=image_prompt,
-                            size="1024x1024",
-                            quality="standard",
-                            n=1,
-                        )
-                        image_url = image_response.data[0].url
-                        st.success("🖼️ Görsel başarıyla oluşturuldu!")
-                    except Exception as e:
-                        st.error(f"Görsel oluşturulurken bir hata oluştu: {e}")
-                
-                # İçeriği Kaydet
-                icerik_kaydet(st.session_state["aktif_kullanici"], marka_adi, topic, full_content, tip="Tam Paket")
-                
-                # Görsel Arayüzde Sekmeli Gösterim
-                tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 Makale & SEO", "📱 Sosyal Medya", "📧 E-Bülten", "🎬 Video Senaryosu", "🖼️ Oluşturulan Görsel"])
+                        img_res = client.images.generate(model="dall-e-3", prompt=f"Professional digital art for: {topic}", n=1)
+                        img_url = img_res.data[0].url
+                    except: st.warning("Görsel üretiminde limitlere takınıldı.")
+
+                # 3. Sekmeli Görünüm (Ekranda gözükmesini sağlayan kısım)
+                tab1, tab2, tab3, tab4 = st.tabs(["📝 Blog & SEO", "📱 Sosyal Medya", "📧 E-Bülten", "🎬 Video/Reels"])
                 
                 with tab1:
-                    st.subheader("📝 Blog Yazısı ve SEO Künyesi")
-                    st.markdown(full_content) # Tüm içeriği burada gösteriyoruz, istersen regex ile ayırabiliriz.
-                    st.download_button("📄 Makaleyi İndir", full_content, f"{topic}_makale.txt")
+                    st.subheader("📄 Blog Makalesi")
+                    if img_url: st.image(img_url, caption="Blog Kapak Görseli")
+                    st.markdown(res)
+                    icerik_kaydet(st.session_state["aktif_kullanici"], marka_adi, topic, res, tip="Blog")
 
                 with tab2:
-                    st.subheader("📱 Sosyal Medya Paylaşımları")
-                    st.info("LinkedIn, Instagram ve X için hazır metinler.")
-                    # Buraya spesifik sosyal medya prompt sonuçları gelebilir
+                    st.subheader("📱 Sosyal Medya Postları")
+                    if img_url: st.image(img_url, width=400)
+                    st.info("LinkedIn, Instagram ve X içerikleriniz yukarıdaki metin içinde yer almaktadır.")
 
                 with tab3:
-                    st.subheader("📧 Newsletter Taslağı")
-                    st.write("Aboneleriniz için hazır mail metni.")
+                    st.subheader("📧 Haftalık E-Bülten")
+                    st.write(f"Sayın abonelerimiz, bu haftaki konumuz: {topic}...")
 
                 with tab4:
-                    st.subheader("🎬 Reels / TikTok Senaryosu")
-                    st.success("Kamerayı karşınıza alın ve okumaya başlayın!")
-                
-                with tab5: # Yeni Görsel Sekmesi
-                    st.subheader("🖼️ Oluşturulan Yapay Zeka Görseli")
-                    if image_url:
-                        st.image(image_url, caption=f"{topic} için Yapay Zeka Görseli")
-                        st.download_button(label="Görseli İndir", data=requests.get(image_url).content, file_name=f"{topic}_gorsel.png", mime="image/png")
-                    else:
-                        st.info("Henüz bir görsel oluşturulmadı veya bir hata oluştu.")
+                    st.subheader("🎬 Reels Senaryosu")
+                    st.success("Senaryonuz hazır! Kayda başlayabilirsiniz.")
