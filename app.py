@@ -5,12 +5,12 @@ import sqlite3
 import pandas as pd
 import plotly.graph_objects as go
 import datetime
-import re # Metin parçalama için kritik kütüphane
+import re
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="VetraPos AI Ultimate", layout="wide", page_icon="🚀")
 
-# --- VERİTABANI ---
+# --- VERİTABANI HAZIRLIĞI ---
 def init_db():
     conn = sqlite3.connect('arsiv.db')
     c = conn.cursor()
@@ -33,99 +33,78 @@ def icerik_kaydet(kullanici, marka, konu, icerik, tip="Makale"):
     conn.commit()
     conn.close()
 
-# --- API ---
+# --- API YAPILANDIRMASI ---
 api_key = "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" 
 client = OpenAI(api_key=api_key)
 
-# --- ARAYÜZ ---
+# --- ZEKA FONKSİYONLARI (DONMAYI ENGELLEYEN YAPI) ---
+def get_canli_skor(marka, sektor):
+    try:
+        prompt = f"{marka} ({sektor}) için AI skorunu sadece rakam ver (0-100)."
+        res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}], timeout=10).choices[0].message.content
+        puan = int(''.join(filter(str.isdigit, res)))
+        return puan
+    except:
+        return 50
+
+def get_marka_yorumu(marka, sektor):
+    try:
+        prompt = f"{marka} markasının {sektor} sektöründeki AI durumu hakkında 2 cümlelik özet ver."
+        res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}], timeout=10).choices[0].message.content
+        return res
+    except:
+        return "Veriler şu an analiz edilemiyor."
+
+# --- ARAYÜZ (SIDEBAR) ---
 with st.sidebar:
-    st.title("👋 Admin")
+    st.title("👋 Admin Panel")
     marka_adi = st.text_input("Markanız", "VetraPos")
     sektor_adi = st.text_input("Sektör", "Sanal POS")
     st.divider()
-    # Emojili nav seçimi, SyntaxError almamak için metinle eşleşmeli
-    nav = st.radio("Menü", ["📊 Dashboard", "🕵️ Rakip Tarayıcı", "✍️ İçerik Üretimi", "📜 Arşiv"])
+    nav = st.radio("Sistem Menüsü", ["📊 Dashboard", "🕵️ Rakip Tarayıcı", "✍️ İçerik Üretimi", "📜 Arşiv"])
 
 # --- 1. DASHBOARD ---
 if nav == "📊 Dashboard":
     st.title("📊 Marka Görünürlük Dashboard")
-    st.info(f"{marka_adi} markası için güncel veriler hazırlanıyor...")
-
-# --- 2. RAKİP TARAYICI ---
-elif nav == "🕵️ Rakip Tarayıcı":
-    st.title("🕵️ Rakip Site Tarayıcı")
-    r_url = st.text_input("Rakip URL")
+    
+    # Donmayı engellemek için butonla tetikleme veya statik gösterim
+    if st.button("🔄 Verileri Güncelle"):
+        with st.spinner("AI Analizi yapılıyor..."):
+            puan = get_canli_skor(marka_adi, sektor_adi)
+            yorum = get_marka_yorumu(marka_adi, sektor_adi)
+            
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                fig = go.Figure(go.Indicator(mode="gauge+number", value=puan, title={'text': "AI Skoru"},
+                                gauge={'axis': {'range': [None, 100]}, 'bar': {'color': "darkblue"}}))
+                st.plotly_chart(fig, use_container_width=True)
+            with col2:
+                st.subheader("🤖 AI Özeti")
+                st.success(yorum)
+    else:
+        st.info("Lütfen verileri çekmek için yukarıdaki butona basın.")
 
 # --- 3. İÇERİK ÜRETİMİ (TAM DOLU SEKMELER) ---
 elif nav == "✍️ İçerik Üretimi":
     st.title("🚀 360° İçerik & Görsel Fabrikası")
-    
-    with st.container():
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            topic = st.text_input("📝 Ana Konu Başlığı", placeholder="Örn: Restoranlar için sanal pos avantajları")
-        with c2:
-            target_tone = st.selectbox("🎭 İçerik Üslubu", ["Kurumsal", "Samimi", "Teknik"])
-    
-    gen_image = st.toggle("🖼️ Yapay Zeka Görseli Üret (DALL-E 3)", value=True)
-    st.divider()
+    topic = st.text_input("📝 Ana Konu Başlığı")
+    gen_image = st.toggle("🖼️ Görsel Üret (DALL-E 3)", value=True)
 
-    if st.button("🌟 Tüm İçerik Paketini Hazırla", use_container_width=True):
+    if st.button("🌟 Tüm İçerik Paketini Hazırla"):
         if not topic:
-            st.error("Lütfen bir konu başlığı girin!")
+            st.error("Konu girin!")
         else:
-            with st.spinner("AI fabrikanız tüm sekmeleri dolduruyor..."):
-                # 1. Metin Üretimi (Özel etiketlerle)
-                prompt = f"""
-                Konu: {topic}
-                Marka: {marka_adi}
-                Üslup: {target_tone}
-                Lütfen içeriği tam olarak şu etiketler arasına yaz:
-                [BLOG_B] ... [BLOG_S]
-                [SOSYAL_B] ... [SOSYAL_S]
-                [BULTEN_B] ... [BULTEN_S]
-                [VIDEO_B] ... [VIDEO_S]
-                """
-                response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+            with st.spinner("İçerikler sekmelere dağıtılıyor..."):
+                prompt = f"Konu: {topic}. Lütfen [BLOG_B]...[BLOG_S], [SOSYAL_B]...[SOSYAL_S], [BULTEN_B]...[BULTEN_S] etiketleriyle yaz."
+                res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
                 
-                # 2. Görsel Üretimi
-                img_url = None
-                if gen_image:
-                    try:
-                        img_res = client.images.generate(model="dall-e-3", prompt=f"Modern marketing visual for: {topic}", n=1)
-                        img_url = img_res.data[0].url
-                    except: st.warning("Görsel üretilemedi.")
+                # Regex ile parçalama
+                def parse(tag):
+                    m = re.search(f"\[{tag}_B\](.*?)\[{tag}_S\]", res, re.DOTALL)
+                    return m.group(1).strip() if m else ""
 
-                # 3. Metin Parçalama (Regex)
-                def parse_it(tag):
-                    match = re.search(f"\[{tag}_B\](.*?)\[{tag}_S\]", response, re.DOTALL)
-                    return match.group(1).strip() if match else ""
-
-                blog_txt = parse_it("BLOG")
-                sosyal_txt = parse_it("SOSYAL")
-                bulten_txt = parse_it("BULTEN")
-                video_txt = parse_it("VIDEO")
-
-                # 4. SEKMELİ GÖRÜNÜM
-                tab1, tab2, tab3, tab4 = st.tabs(["📝 Blog & SEO", "📱 Sosyal Medya", "📧 E-Bülten", "🎬 Video/Reels"])
-                
-                with tab1:
-                    if img_url: st.image(img_url, caption=topic)
-                    st.markdown(blog_txt if blog_txt else response)
-                    icerik_kaydet("admin", marka_adi, topic, blog_txt if blog_txt else response, tip="Blog")
-
-                with tab2:
-                    st.subheader("📱 Sosyal Medya Kanalları")
-                    st.markdown(sosyal_txt if sosyal_txt else "İçerik ayrıştırılamadı.")
-
-                with tab3:
-                    st.subheader("📧 Haftalık Bülten Taslağı")
-                    st.markdown(bulten_txt if bulten_txt else "İçerik ayrıştırılamadı.")
-
-                with tab4:
-                    st.subheader("🎬 Kısa Video Senaryosu")
-                    st.markdown(video_txt if video_txt else "İçerik ayrıştırılamadı.")
-
-# --- 4. ARŞİV ---
-elif nav == "📜 Arşiv":
-    st.title("📜 İçerik Arşivi")
+                t1, t2, t3 = st.tabs(["📝 Blog", "📱 Sosyal", "📧 Bülten"])
+                with t1: st.markdown(parse("BLOG") if parse("BLOG") else res)
+                with t2: st.markdown(parse("SOSYAL"))
+                with t3: st.markdown(parse("BULTEN"))
+                icerik_kaydet("admin", marka_adi, topic, res, tip="Tam Paket")
