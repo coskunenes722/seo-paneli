@@ -69,10 +69,10 @@ with st.sidebar:
     
     st.info("Marka ve Sektör girmezseniz analiz çalışmaz.")
 
-# 3. YAPAY ZEKA FONKSIYONLARI
+# 3. YAPAY ZEKA FONKSIYONLARI (TÜMÜ)
 
 def get_ai_suggestions(brand, sector):
-    # Analiz Fonksiyonu
+    # Analiz
     prompt = f"""
     Sen {brand} markası için {sector} sektöründe uzman bir SEO stratejistisin.
     Lütfen şu 3 başlık altında detaylı bir analiz yap:
@@ -91,7 +91,7 @@ def get_ai_suggestions(brand, sector):
         return f"Hata: {e}"
 
 def get_ai_brand_awareness(brand, sector):
-    # Marka Karnesi + Reçete
+    # Marka Karnesi
     prompt = f"""
     Sen bir Yapay Zeka Denetçisisin. "{brand}" markasını {sector} sektöründe analiz et.
     Bana şu formatta samimi bir rapor ver:
@@ -100,6 +100,27 @@ def get_ai_brand_awareness(brand, sector):
     3. **Eksik Gedik:** (Genel olarak neler eksik?)
     4. **🚀 Puanı Yükseltecek 3 Altın Makale Konusu:** (Markanın bilinirliğini artırmak için hemen yazılması gereken, dikkat çekici 3 tam makale başlığı öner.)
     Lütfen çıktılarını şık bir formatta, başlıklarla ayırarak ver.
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Hata: {e}"
+
+def get_content_calendar(brand, sector):
+    # YENI: 1 Aylık İçerik Takvimi
+    prompt = f"""
+    Marka: {brand}. Sektör: {sector}.
+    
+    Bu marka için 4 haftalık (1 aylık) stratejik bir içerik takvimi hazırla.
+    Çıktıyı Markdown TABLOSU olarak ver.
+    
+    Tablo Sütunları: [Hafta, Odak Konusu, Blog Başlığı, Sosyal Medya Fikri (Reels/Post)]
+    
+    Her hafta için farklı bir strateji (Örn: Bilinirlik, Satış, Güven, Eğitim) belirle.
     """
     try:
         response = client.chat.completions.create(
@@ -134,7 +155,7 @@ def write_full_article(topic, brand, tone):
         return f"Hata: {e}"
 
 def write_social_media_posts(topic, brand, tone):
-    # Sosyal Medya Paketi
+    # Sosyal Medya
     prompt = f"""
     Konu: "{topic}". Marka: {brand}. Üslup: {tone}.
     Bu blog yazısını tanıtmak için 3 farklı platforma içerik hazırla:
@@ -153,7 +174,7 @@ def write_social_media_posts(topic, brand, tone):
         return f"Hata: {e}"
 
 def write_newsletter(topic, brand, tone):
-    # E-Bülten Modülü
+    # E-Bülten
     prompt = f"""
     Konu: "{topic}". Marka: {brand}. Üslup: {tone}.
     Bu blog yazısını, mevcut müşterilere gönderilecek profesyonel bir E-Bülten formatına çevir.
@@ -170,7 +191,7 @@ def write_newsletter(topic, brand, tone):
         return f"Hata: {e}"
 
 def generate_seo_tags(topic, brand):
-    # Teknik SEO Künyesi
+    # SEO Künyesi
     prompt = f"""
     Konu: "{topic}". Marka: {brand}.
     Bu blog yazısı için Google'ın seveceği teknik SEO etiketlerini hazırla.
@@ -190,6 +211,28 @@ def generate_seo_tags(topic, brand):
     except Exception as e:
         return f"Hata: {e}"
 
+def generate_video_script(topic, brand, tone):
+    # YENI: Video Senaryosu
+    prompt = f"""
+    Konu: "{topic}". Marka: {brand}. Üslup: {tone}.
+    
+    Bu konu hakkında Instagram Reels / TikTok / YouTube Shorts için 60 saniyelik virallik potansiyeli yüksek bir senaryo yaz.
+    
+    Tablo Formatında Olsun:
+    [Süre, Görsel Sahne, Seslendirme (Dış Ses/Konuşma), Ekrana Gelecek Yazı]
+    
+    0-5sn: Çok güçlü bir kanca (Hook) ile başla.
+    Sonunda mutlaka harekete geçirici mesaj (CTA) olsun.
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Hata: {e}"
+
 # 4. ANA SAYFA TASARIMI
 st.title("🚀 Yapay Zeka SEO & Sosyal Medya Paneli")
 
@@ -198,69 +241,81 @@ col1, col2 = st.columns([1,1])
 with col1:
     st.info("🕵️ **1. Adım: Analiz & Strateji**")
     
-    # Buton 1: Genel Analiz
-    if st.button("🚀 Detaylı SEO Analizi Yap"):
+    # Analiz Butonlari
+    c1, c2 = st.columns([1,1])
+    
+    if c1.button("🚀 Genel Analiz"):
         if not marka_adi or not sektor:
-            st.error("Lütfen önce sol menüden Marka ve Sektör girin!")
+            st.error("Marka ve Sektör girin!")
         else:
-            with st.spinner("Rakipler inceleniyor..."):
+            with st.spinner("Analiz yapılıyor..."):
                 sonuc = get_ai_suggestions(marka_adi, sektor)
                 st.markdown(sonuc)
-                st.success("Analiz tamamlandı!")
 
-    st.markdown("---") 
+    if c2.button("🤖 Marka Karnesi"):
+        if not marka_adi or not sektor:
+            st.error("Marka ve Sektör girin!")
+        else:
+            with st.spinner("Marka inceleniyor..."):
+                karne = get_ai_brand_awareness(marka_adi, sektor)
+                st.info("### 📢 Marka Bilinirlik Raporu")
+                st.write(karne)
 
-    # Buton 2: Marka Karnesi
-    if st.button("🤖 AI Marka Karnesini Çıkar"):
+    st.markdown("---")
+    
+    # YENI: Icerik Takvimi Butonu
+    if st.button("📅 1 Aylık İçerik Takvimi Oluştur"):
         if not marka_adi or not sektor:
             st.error("Lütfen marka ve sektör girin!")
         else:
-            with st.spinner("ChatGPT markanızı araştırıyor..."):
-                karne = get_ai_brand_awareness(marka_adi, sektor)
-                st.info("### 📢 Yapay Zeka Gözünde Markanız")
-                st.write(karne)
-                st.warning("Aşağıdaki 'Altın Konuları' kopyalayıp yandaki panele yapıştırın! 👉")
+            with st.spinner("Stratejik plan hazırlanıyor..."):
+                takvim = get_content_calendar(marka_adi, sektor)
+                st.success("### 🗓️ 30 Günlük Yol Haritası")
+                st.write(takvim)
 
 with col2:
     st.success("✍️ **2. Adım: İçerik Üretimi**")
-    topic_input = st.text_area("Hangi konuyu yazalım?", placeholder="Soldaki analizden bir başlık kopyalayıp buraya yapıştırın...")
+    topic_input = st.text_area("Hangi konuyu yazalım?", placeholder="Bir başlık yapıştırın...")
     
-    # 4 butonu yan yana diziyoruz
-    b1, b2, b3, b4 = st.columns([1,1,1,1])
-    
-    if b1.button("Makaleyi Yaz"):
-        if not topic_input or len(topic_input) < 5:
-            st.warning("Konu giriniz.")
-        else:
-            with st.spinner("Makale yazılıyor..."):
-                if not marka_adi: marka_adi = "Genel"
-                article = write_full_article(topic_input, marka_adi, uslup)
-                st.markdown(article)
-                st.download_button("💾 Makaleyi İndir", article, file_name="seo-makale.md")
+    # 1. Satir Butonlar
+    b1, b2 = st.columns([1,1])
+    if b1.button("📝 Makaleyi Yaz"):
+        if len(topic_input) > 3:
+            with st.spinner("Yazılıyor..."):
+                art = write_full_article(topic_input, marka_adi, uslup)
+                st.markdown(art)
+                st.download_button("💾 İndir", art, file_name="makale.md")
+        else: st.warning("Konu giriniz.")
 
-    if b2.button("Sosyal Medya"):
-        if not topic_input or len(topic_input) < 5:
-            st.warning("Önce bir konu giriniz.")
-        else:
-            with st.spinner("Postlar hazırlanıyor..."):
-                posts = write_social_media_posts(topic_input, marka_adi, uslup)
-                st.info("### 📱 Sosyal Medya İçerikleri")
-                st.write(posts)
-
-    if b3.button("E-Bülten"):
-        if not topic_input or len(topic_input) < 5:
-            st.warning("Önce bir konu giriniz.")
-        else:
-            with st.spinner("Mail taslağı yazılıyor..."):
-                newsletter = write_newsletter(topic_input, marka_adi, uslup)
-                st.success("### 📧 E-Bülten Taslağı")
-                st.write(newsletter)
-
-    if b4.button("🏷️ SEO Künyesi"):
-        if not topic_input or len(topic_input) < 5:
-            st.warning("Önce bir konu giriniz.")
-        else:
-            with st.spinner("Meta etiketleri hazırlanıyor..."):
+    if b2.button("🏷️ SEO Künyesi"):
+        if len(topic_input) > 3:
+            with st.spinner("Etiketler..."):
                 tags = generate_seo_tags(topic_input, marka_adi)
-                st.warning("### 🏷️ Teknik SEO Ayarları")
                 st.write(tags)
+        else: st.warning("Konu giriniz.")
+
+    st.markdown("---") # Ayirac
+
+    # 2. Satir Butonlar
+    b3, b4, b5 = st.columns([1,1,1])
+    
+    if b3.button("📱 Sosyal Medya"):
+        if len(topic_input) > 3:
+            with st.spinner("Postlar..."):
+                st.write(write_social_media_posts(topic_input, marka_adi, uslup))
+        else: st.warning("Konu giriniz.")
+
+    if b4.button("📧 E-Bülten"):
+        if len(topic_input) > 3:
+            with st.spinner("Mail..."):
+                st.write(write_newsletter(topic_input, marka_adi, uslup))
+        else: st.warning("Konu giriniz.")
+
+    # YENI: Video Senaryosu Butonu
+    if b5.button("🎬 Video Script"):
+        if len(topic_input) > 3:
+            with st.spinner("Senaryo yazılıyor..."):
+                script = generate_video_script(topic_input, marka_adi, uslup)
+                st.warning("### 🎬 Reels/TikTok Senaryosu")
+                st.write(script)
+        else: st.warning("Konu giriniz.")
