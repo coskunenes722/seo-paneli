@@ -31,27 +31,29 @@ init_db()
 # --- 4. ZEKA FONKSİYONLARI ---
 def analiz_yap(marka, sektor):
     try:
-        # Puan Analizi
-        p_prompt = f"'{marka}' markasının '{sektor}' pazarındaki AI bilinirlik puanını (0-100) sadece rakam olarak ver. Başka hiçbir şey yazma."
+        # GERÇEKÇİ PUANLAMA İSTEMİ
+        p_prompt = f"""
+        Görev: Bir markanın dijital dünyadaki gerçek ağırlığını puanla.
+        Kriterler: Küresel bilinirlik, arama hacmi, sosyal medya gücü ve sektördeki hakimiyet.
+        Marka: {marka}
+        Sektör: {sektor}
+        
+        Önemli Kural: Coca Cola, Apple gibi devler 95-100 almalıdır. 
+        Yerel veya yeni markalar (VetraPos gibi) 10-30 arası başlamalıdır.
+        Sadece 0-100 arası bir rakam ver. Başka hiçbir şey yazma.
+        """
+        
         p_res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": p_prompt}], timeout=15).choices[0].message.content
-        
-        # Sadece rakamları filtrele
         digits = ''.join(filter(str.isdigit, p_res))
+        puan = int(digits) if digits else 50
         
-        if not digits: # Eğer AI rakam döndürmediyse varsayılan 50 ver
-            puan = 50
-        else:
-            puan = int(digits)
-            
-        # Stratejik Özet
-        y_prompt = f"{marka} ({sektor}) için 3 maddelik stratejik AI pazar özeti yaz."
+        # Stratejik özet kısmında da gerçekçi olmasını istiyoruz
+        y_prompt = f"{marka} markasının {sektor} pazarındaki güncel konumunu gerçek piyasa verilerine dayanarak 3 maddede özetle."
         yorum = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": y_prompt}], timeout=15).choices[0].message.content
         
         return puan, yorum
     except Exception as e:
-        # Hata mesajını daha detaylı gösterelim
-        return 50, f"Bağlantı veya API Hatası: {str(e)}"
-# --- 5. SIDEBAR (MARKA KONTROLÜ) ---
+        return 50, f"Hata: {str(e)}"# --- 5. SIDEBAR (MARKA KONTROLÜ) ---
 with st.sidebar:
     st.title("🚀 Admin Panel")
     marka_adi = st.text_input("Markanız", "Coca Cola")
