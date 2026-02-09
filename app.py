@@ -66,6 +66,25 @@ client = OpenAI(api_key=api_key)
 
 # --- YENI GELISMIS FONKSIYONLAR ---
 def get_ai_suggestions(brand, sector):
+def get_ai_brand_awareness(brand, sector):
+    prompt = f"""
+    Sen bir Yapay Zeka Denetçisisin. "{brand}" markasını {sector} sektöründe analiz et.
+    
+    Bana şu formatta kısa bir rapor ver:
+    1. **Bilinirlik Skoru:** (0 ile 100 arasında bir puan ver. Eğer marka çok yeniyse düşük ver.)
+    2. **Yapay Zeka Görüşü:** (ChatGPT olarak bu marka hakkında ne biliyorsun? Olumlu/Olumsuz/Nötr mü?)
+    3. **Eksik Gedik:** (Bu markanın yapay zekada daha iyi tanınması için hangi konularda içerik üretmesi lazım?)
+    
+    Lütfen samimi ve gerçekçi ol.
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Hata: {e}"
     # 3 degil, artik 5 konu oneriyoruz ve daha detayli istiyoruz
     prompt = f"""
     Sen {brand} markası için {sector} sektöründe uzman bir SEO stratejistisin.
@@ -112,6 +131,21 @@ col1, col2 = st.columns([1,1])
 with col1:
     st.info("🕵️ **1. Adım: Rakip & Kelime Analizi**")
     if st.button("🚀 Detaylı SEO Analizi Yap"):
+# Mevcut "Detaylı SEO Analizi Yap" butonunun hemen altına bu yeni butonu ekle:
+    st.markdown("---") # Araya cizgi cekelim
+    
+    if st.button("🤖 AI Marka Karnesini Çıkar"):
+        if not marka_adi or not sektor:
+            st.error("Lütfen marka ve sektör girin!")
+        else:
+            with st.spinner(f"ChatGPT, {marka_adi} markasını araştırıyor..."):
+                karne = get_ai_brand_awareness(marka_adi, sektor)
+                
+                # Sonuclari gosterelim
+                st.info("### 📢 Yapay Zeka Gözünde Markanız")
+                st.write(karne)
+                
+                st.warning("💡 **İpucu:** Puanınız düşükse, yandaki panelden makale yazdırarak yapay zekayı eğitebilirsiniz!")
         if not marka_adi or not sektor:
             st.error("Lütfen önce sol menüden Marka ve Sektör girin!")
         else:
