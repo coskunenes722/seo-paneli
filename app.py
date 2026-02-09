@@ -1,117 +1,68 @@
 import streamlit as st
 from openai import OpenAI
-import time
 import sqlite3
 import pandas as pd
 import plotly.graph_objects as go
 import datetime
 import re
-import requests
 
-# --- SAYFA AYARLARI ---
-st.set_page_config(page_title="VetraPos AI Ultimate", layout="wide", page_icon="🚀")
-
-# --- API YAPILANDIRMASI ---
-OPENAI_KEY = "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"
-SERPAPI_KEY = "BURAYA_SERPAPI_KEY_YAZIN" # Gerçek Google verileri için (Opsiyonel)
-
+# --- API ---
+OPENAI_KEY = "sk-proj-..." # Kendi key'inizi buraya girin
 client = OpenAI(api_key=OPENAI_KEY)
 
-# --- VERİTABANI VE İLK KURULUM ---
-def init_db():
-    conn = sqlite3.connect('arsiv.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS icerikler 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, marka TEXT, konu TEXT, icerik TEXT, tarih TEXT, tip TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS skorlar 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, marka TEXT, puan INTEGER, tarih TEXT)''')
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# --- YARDIMCI FONKSİYONLAR ---
-def icerik_kaydet(kullanici, marka, konu, icerik, tip="Makale"):
-    conn = sqlite3.connect('arsiv.db')
-    c = conn.cursor()
-    tarih = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    c.execute("INSERT INTO icerikler (kullanici, marka, konu, icerik, tarih, tip) VALUES (?, ?, ?, ?, ?, ?)",
-              (kullanici, marka, konu, icerik, tarih, tip))
-    conn.commit()
-    conn.close()
-
-def get_canli_skor(marka, sektor):
-    # Gerçekçi puanlama: Marka bilinirliğine göre mantıksal analiz
-    prompt = f"'{marka}' markasının '{sektor}' sektöründeki dijital varlığını 0-100 arası puanla. Sadece rakam ver."
+# --- 1. DİNAMİK VERİ ÇEKME FONKSİYONLARI ---
+def analiz_yap(marka, sektor):
+    # Marka değiştiğinde AI'dan yeni ve özgün veriler alır
     try:
-        res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}], timeout=10).choices[0].message.content
-        puan = int(''.join(filter(str.isdigit, res)))
-        tarih = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        conn = sqlite3.connect('arsiv.db')
-        c = conn.cursor()
-        c.execute("INSERT INTO skorlar (marka, puan, tarih) VALUES (?, ?, ?)", (marka, puan, tarih))
-        conn.commit()
-        conn.close()
-        return puan
-    except: return 50
+        p_prompt = f"{marka} ({sektor}) için global AI bilinirlik puanı ver (0-100). Sadece rakam."
+        p_res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": p_prompt}]).choices[0].message.content
+        puan = int(''.join(filter(str.isdigit, p_res)))
+        
+        y_prompt = f"{marka} markasının {sektor} sektöründeki konumu hakkında 3 maddelik stratejik özet yaz."
+        yorum = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": y_prompt}]).choices[0].message.content
+        
+        return puan, yorum
+    except:
+        return 50, "Analiz şu an yapılamıyor."
 
-def get_marka_yorumu(marka, sektor):
-    prompt = f"{marka} ({sektor}) için 3 maddelik stratejik AI pazar özeti yaz."
-    try:
-        return client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
-    except: return "Analiz şu an yapılamıyor."
-
-def google_serp_analiz(marka, anahtar_kelime):
-    # SerpApi varsa gerçek veri çeker, yoksa AI ile simüle eder
-    if SERPAPI_KEY:
-        params = {"q": anahtar_kelime, "api_key": SERPAPI_KEY}
-        try:
-            search_res = requests.get("https://serpapi.com/search", params=params).json()
-            # Basit bir sıralama kontrolü (ilk 10 sonuçta var mı?)
-            found = False
-            for result in search_res.get("organic_results", []):
-                if marka.lower() in result["title"].lower() or marka.lower() in result["link"].lower():
-                    found = True
-                    return f"✅ Markanız '{anahtar_kelime}' kelimesinde ilk sayfa sonuçlarında tespit edildi!"
-            if not found: return f"❌ Markanız '{anahtar_kelime}' kelimesinde ilk sayfada henüz yer almıyor."
-        except: pass
-    
-    # AI Simülasyonu
-    prompt = f"Google'da '{anahtar_kelime}' araması yapıldığında {marka} markasının çıkma olasılığını analiz et."
-    return client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
-
-# --- ARAYÜZ (SIDEBAR) ---
+# --- ARAYÜZ ---
 with st.sidebar:
     st.title("👋 Admin Panel")
-    marka_adi = st.text_input("Markanız", "VetraPos")
-    sektor_adi = st.text_input("Sektör", "Sanal POS")
-    st.divider()
-    nav = st.radio("Sistem Menüsü", ["📊 Dashboard", "🕵️ Rakip Tarayıcı", "✍️ İçerik Üretimi", "📜 Arşiv"])
-
-# --- 1. DASHBOARD (PROFESYONEL & CANLI) ---
-if nav == "📊 Dashboard":
-    st.markdown(f"<h1 style='text-align: center; color: #1E3A8A;'>🚀 {marka_adi} Stratejik Operasyon Merkezi</h1>", unsafe_allow_html=True)
+    yeni_marka = st.text_input("Markanız", "VetraPos")
+    # Marka değiştiyse verileri sıfırla
+    if "eski_marka" not in st.session_state or st.session_state["eski_marka"] != yeni_marka:
+        st.session_state["eski_marka"] = yeni_marka
+        st.session_state["puan"] = None
+        st.session_state["yorum"] = None
     
-    if st.button("🔄 Verileri Derinlemesine Güncelle", use_container_width=True):
-        with st.spinner("Anlık pazar taraması yapılıyor..."):
-            puan = get_canli_skor(marka_adi, sektor_adi)
-            yorum = get_marka_yorumu(marka_adi, sektor_adi)
-            
-            # Üst Metrik Kartları
-            m1, m2, m3 = st.columns(3)
-            m1.metric("AI Bilinirlik", f"%{puan}")
-            m2.metric("Pazar Durumu", "Analiz Edildi")
-            m3.metric("Trend", "Yükseliyor 📈")
+    sektor_adi = st.text_input("Sektör", "Sanal POS")
+    nav = st.radio("Menü", ["📊 Dashboard", "✍️ İçerik Üretimi"])
 
-            col1, col2 = st.columns([1, 1.2])
-            with col1:
-                fig = go.Figure(go.Indicator(mode="gauge+number", value=puan, title={'text': "AI Skoru"},
-                                gauge={'axis': {'range': [None, 100]}, 'bar': {'color': "#3B82F6"},
-                                'steps': [{'range': [0, 50], 'color': '#FECACA'}, {'range': [50, 100], 'color': '#BBF7D0'}]}))
-                st.plotly_chart(fig, use_container_width=True)
-            with col2:
-                st.subheader("🤖 Yapay Zeka Strateji Özeti")
-                st.success(yorum)
+# --- DASHBOARD ---
+if nav == "📊 Dashboard":
+    st.markdown(f"<h1 style='text-align: center;'>🚀 {yeni_marka} Operasyon Merkezi</h1>", unsafe_allow_html=True)
+    
+    # Butona basıldığında veya veri yoksa analiz yap
+    if st.button("🔄 Verileri Derinlemesine Güncelle", use_container_width=True) or st.session_state["puan"] is None:
+        with st.spinner(f"{yeni_marka} analiz ediliyor..."):
+            p, y = analiz_yap(yeni_marka, sektor_adi)
+            st.session_state["puan"] = p
+            st.session_state["yorum"] = y
+            st.rerun() # Verileri ekrana basmak için yenile
+
+    # GÖRSELLEŞTİRME
+    puan = st.session_state["puan"]
+    yorum = st.session_state["yorum"]
+    
+    c1, c2 = st.columns([1, 1.5])
+    with c1:
+        fig = go.Figure(go.Indicator(mode="gauge+number", value=puan, title={'text': "AI Skoru"},
+                        gauge={'axis': {'range': [None, 100]}, 'bar': {'color': "#3B82F6"},
+                        'steps': [{'range': [0, 70], 'color': '#FDE68A'}, {'range': [70, 100], 'color': '#BBF7D0'}]}))
+        st.plotly_chart(fig, use_container_width=True)
+    with c2:
+        st.subheader("🤖 Stratejik Özet")
+        st.success(yorum)
 
     st.divider()
     st.subheader("🔍 Live Search: Gerçek Zamanlı Google Analizi")
