@@ -34,7 +34,7 @@ def icerik_kaydet(kullanici, marka, konu, icerik, tip="Makale"):
 
 # --- 4. API YAPILANDIRMASI ---
 # DİKKAT: Anahtarı tek satırda yazın ve tırnakla kapatın!
-OPENAI_KEY = "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"
+OPENAI_KEY = "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"
 client = OpenAI(api_key=OPENAI_KEY)
 
 # --- 5. ZEKA FONKSİYONLARI ---
