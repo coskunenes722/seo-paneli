@@ -152,6 +152,31 @@ def write_social_media_posts(topic, brand, tone):
     except Exception as e:
         return f"Hata: {e}"
 
+def write_newsletter(topic, brand, tone):
+    # Yeni Özellik: E-Bülten Modülü
+    prompt = f"""
+    Konu: "{topic}". Marka: {brand}. Üslup: {tone}.
+    
+    Bu blog yazısını, mevcut müşterilere gönderilecek profesyonel bir E-Bülten (Email Newsletter) formatına çevir.
+    
+    Format Şöyle Olsun:
+    1. **Konu Satırı:** (İlgi çekici, tıklanma oranı yüksek bir başlık)
+    2. **Selamlama:** (Kişiselleştirilmiş giriş)
+    3. **Giriş:** (Sorunu tanımla)
+    4. **Gelişme:** (Blog yazısındaki çözümün özeti)
+    5. **Çağrı (CTA):** (Ürünü denemeye veya blog yazısının tamamını okumaya yönlendir)
+    
+    Lütfen kısa, net ve mobil uyumlu paragraflar kullan.
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Hata: {e}"
+
 # 4. ANA SAYFA TASARIMI
 st.title("🚀 Yapay Zeka SEO & Sosyal Medya Paneli")
 
