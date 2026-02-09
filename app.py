@@ -3,6 +3,26 @@ import os
 from openai import OpenAI
 import datetime
 
+# --- BURASI KILIT KODU BASLANGICI ---
+sifre = "147258"  # Buraya istedigin sifreyi yaz (Musteriye bunu vereceksin)
+
+if "giris_yapildi" not in st.session_state:
+    st.session_state["giris_yapildi"] = False
+
+if not st.session_state["giris_yapildi"]:
+    st.title("🔒 VetraPos SEO Paneli - Giriş")
+    girilen_sifre = st.text_input("Lütfen Şifreyi Giriniz:", type="password")
+    
+    if st.button("Giriş Yap"):
+        if girilen_sifre == sifre:
+            st.session_state["giris_yapildi"] = True
+            st.success("Giriş Başarılı! Yönlendiriliyorsunuz...")
+            st.rerun()
+        else:
+            st.error("Hatalı şifre! Lütfen satın aldığınız şifreyi girin.")
+    st.stop()  # Sifre dogru degilse buradan sonrasi asla calismaz!
+# --- BURASI KILIT KODU BITISI ---
+
 # --- AYARLAR ---
 st.set_page_config(page_title="VetraPos AI SEO", layout="wide")
 
