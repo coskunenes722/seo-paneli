@@ -1,9 +1,12 @@
 import streamlit as st
 from openai import OpenAI
 import time
+import requests
+import base64
+from fpdf import FPDF
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="VetraPos AI Agency", layout="wide")
+st.set_page_config(page_title="VetraPos AI Agency Pro", layout="wide")
 
 # --- PROFESYONEL GIRIS SISTEMI ---
 KULLANICILAR = {
@@ -40,7 +43,7 @@ if not st.session_state["giris_yapildi"]:
 
 # --- ANA UYGULAMA BASLANGICI ---
 
-# 1. API ANAHTARI (BURAYA KENDİ ŞİFRENİ YAPIŞTIR)
+# 1. API ANAHTARI
 api_key = "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" 
 
 try:
@@ -49,273 +52,238 @@ except:
     st.error("API Key hatası! Lütfen kodun 37. satırına şifrenizi doğru yapıştırdığınızdan emin olun.")
     st.stop()
 
+# --- YARDIMCI FONKSIYONLAR ---
+def clean_text_for_pdf(text):
+    # FPDF basit fontlari Turkce karakterleri bazen bozar, onlari duzeltiyoruz
+    replacements = {
+        "ğ": "g", "Ğ": "G", "ü": "u", "Ü": "U", "ş": "s", "Ş": "S", 
+        "ı": "i", "İ": "I", "ö": "o", "Ö": "O", "ç": "c", "Ç": "C"
+    }
+    for search, replace in replacements.items():
+        text = text.replace(search, replace)
+    return text
+
+def create_pdf_report(content, filename="rapor.pdf"):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    
+    # Baslik
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, txt="VetraPos AI SEO Raporu", ln=1, align='C')
+    
+    # Icerik
+    pdf.set_font("Arial", size=10)
+    clean_content = clean_text_for_pdf(content)
+    pdf.multi_cell(0, 10, txt=clean_content)
+    
+    return pdf.output(dest='S').encode('latin-1')
+
+def post_to_wordpress(title, content, wp_url, wp_user, wp_password):
+    # WordPress REST API Entegrasyonu
+    creds = f"{wp_user}:{wp_password}"
+    token = base64.b64encode(creds.encode())
+    headers = {'Authorization': f'Basic {token.decode("utf-8")}'}
+    
+    post = {
+        'title': title,
+        'content': content,
+        'status': 'draft' # Güvenlik için taslak olarak atar
+    }
+    
+    try:
+        r = requests.post(f"{wp_url}/wp-json/wp/v2/posts", headers=headers, json=post)
+        if r.status_code == 201:
+            return f"✅ Başarılı! Yazı ID: {r.json()['id']} olarak taslaklara eklendi."
+        else:
+            return f"❌ Hata: {r.status_code} - {r.text}"
+    except Exception as e:
+        return f"Bağlantı Hatası: {e}"
+
 # 2. YAN MENU (SIDEBAR)
 with st.sidebar:
-    st.success(f"👤 Giriş Yapan: {st.session_state['aktif_kullanici']}")
+    st.success(f"👤 {st.session_state['aktif_kullanici']}")
     if st.button("Çıkış Yap"):
         st.session_state["giris_yapildi"] = False
         st.rerun()
     
     st.divider()
-    st.header("⚙️ Ayarlar")
+    st.header("⚙️ Marka Ayarları")
     marka_adi = st.text_input("Marka Adı", value="")
     sektor = st.text_input("Sektör", value="")
+    uslup = st.selectbox("Marka Dili", ["Kurumsal", "Samimi", "Teknik", "Satış Odaklı"])
     
-    # Üslup Seçimi
-    uslup = st.selectbox(
-        "Marka Dili (Üslup)", 
-        ["Kurumsal ve Profesyonel", "Samimi ve Eğlenceli", "Bilimsel ve Teknik", "İkna Edici ve Satış Odaklı"]
-    )
-    
-    st.info("Marka ve Sektör girmezseniz analiz çalışmaz.")
+    st.divider()
+    st.header("🌐 WordPress Ayarları")
+    st.info("Yazıları otomatik sitenize göndermek için doldurun (İsteğe bağlı).")
+    wp_url = st.text_input("Site Adresi (örn: https://vetrapos.com)")
+    wp_user = st.text_input("WP Kullanıcı Adı")
+    wp_pass = st.text_input("WP Uygulama Şifresi", type="password", help="WP Admin > Kullanıcılar > Profil > Uygulama Şifreleri kısmından almalısınız.")
 
-# 3. YAPAY ZEKA FONKSIYONLARI (TÜMÜ)
+# 3. YAPAY ZEKA FONKSIYONLARI
 
 def get_ai_suggestions(brand, sector):
-    # Analiz
-    prompt = f"""
-    Sen {brand} markası için {sector} sektöründe uzman bir SEO stratejistisin.
-    Lütfen şu 3 başlık altında detaylı bir analiz yap:
-    1. **5 Adet Teknik Blog Konusu:** {brand} markasının otoritesini artıracak, az bilinen ama çok aranan 5 teknik konu öner.
-    2. **Anahtar Kelime Analizi:** {sector} sektörü için hacmi yüksek ama rekabeti düşük 10 adet "Long-tail" (uzun kuyruklu) anahtar kelime öner.
-    3. **Rakip Analizi:** {sector} sektöründeki rakiplerin genellikle neleri eksik yaptığını ve {brand} markasının nasıl öne çıkabileceğini anlatan 3 maddelik strateji ver.
-    Lütfen çıktılarını şık bir formatta, başlıklarla ayırarak ver.
-    """
+    prompt = f"Sen {brand} için {sector} sektöründe SEO uzmanısın. 5 blog konusu, 10 anahtar kelime, 3 rakip stratejisi öner. Markdown formatında yaz."
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
+        response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         return response.choices[0].message.content
-    except Exception as e:
-        return f"Hata: {e}"
+    except Exception as e: return f"Hata: {e}"
 
 def get_ai_brand_awareness(brand, sector):
-    # Marka Karnesi
-    prompt = f"""
-    Sen bir Yapay Zeka Denetçisisin. "{brand}" markasını {sector} sektöründe analiz et.
-    Bana şu formatta samimi bir rapor ver:
-    1. **Bilinirlik Skoru:** (0 ile 100 arasında bir puan ver. Marka çok yeniyse düşük ver.)
-    2. **Yapay Zeka Görüşü:** (ChatGPT olarak bu marka hakkında ne biliyorsun? Olumlu/Olumsuz/Nötr mü?)
-    3. **Eksik Gedik:** (Genel olarak neler eksik?)
-    4. **🚀 Puanı Yükseltecek 3 Altın Makale Konusu:** (Markanın bilinirliğini artırmak için hemen yazılması gereken, dikkat çekici 3 tam makale başlığı öner.)
-    Lütfen çıktılarını şık bir formatta, başlıklarla ayırarak ver.
-    """
+    prompt = f"Yapay zeka denetçisisin. {brand} ({sector}) için marka bilinirlik puanı (0-100), yapay zeka görüşü ve puanı artıracak 3 makale başlığı öner."
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
+        response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         return response.choices[0].message.content
-    except Exception as e:
-        return f"Hata: {e}"
+    except Exception as e: return f"Hata: {e}"
 
 def get_content_calendar(brand, sector):
-    # YENI: 1 Aylık İçerik Takvimi
-    prompt = f"""
-    Marka: {brand}. Sektör: {sector}.
-    
-    Bu marka için 4 haftalık (1 aylık) stratejik bir içerik takvimi hazırla.
-    Çıktıyı Markdown TABLOSU olarak ver.
-    
-    Tablo Sütunları: [Hafta, Odak Konusu, Blog Başlığı, Sosyal Medya Fikri (Reels/Post)]
-    
-    Her hafta için farklı bir strateji (Örn: Bilinirlik, Satış, Güven, Eğitim) belirle.
-    """
+    prompt = f"{brand} ({sector}) için 4 haftalık içerik takvimi (Tablo formatında: Hafta, Konu, Kanal). Markdown tablosu ver."
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
+        response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         return response.choices[0].message.content
-    except Exception as e:
-        return f"Hata: {e}"
+    except Exception as e: return f"Hata: {e}"
 
 def write_full_article(topic, brand, tone):
-    # Makale Yazari
-    prompt = f"""
-    Konu: {topic}. Marka: {brand}. 
-    Dil ve Üslup: {tone} bir dille yazılacak.
-    
-    600 kelimelik, SEO uyumlu, teknik bir blog yazısı yaz.
-    - İçinde mutlaka bir HTML tablosu olsun.
-    - Alt başlıklar (h2, h3) kullan.
-    - İçeriğin en altına JSON-LD formatında Schema (FAQ) kodu ekle.
-    """
+    prompt = f"Konu: {topic}. Marka: {brand}. Üslup: {tone}. 600 kelime, SEO uyumlu, HTML tablolu, Schema kodlu makale yaz."
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
-            messages=[
-                {"role": "system", "content": f"Sen {brand} markası için {tone} içerik üreten profesyonel bir yazarsın."},
-                {"role": "user", "content": prompt}
-            ]
+            messages=[{"role": "system", "content": "Profesyonel yazar."}, {"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content
+    except Exception as e: return f"Hata: {e}"
+
+def generate_image(topic):
+    # DALL-E 3 Görsel Üretimi
+    try:
+        response = client.images.generate(
+            model="dall-e-3",
+            prompt=f"High quality, realistic, professional photo about: {topic}. Clean composition, suitable for a corporate blog header.",
+            size="1024x1024",
+            quality="standard",
+            n=1,
+        )
+        return response.data[0].url
     except Exception as e:
-        return f"Hata: {e}"
+        return None
 
 def write_social_media_posts(topic, brand, tone):
-    # Sosyal Medya
-    prompt = f"""
-    Konu: "{topic}". Marka: {brand}. Üslup: {tone}.
-    Bu blog yazısını tanıtmak için 3 farklı platforma içerik hazırla:
-    1. **LinkedIn Gönderisi:** (Profesyonel, emojili, hashtag'li)
-    2. **Instagram Açıklaması:** (Samimi, harekete geçirici, bol hashtag'li)
-    3. **Twitter (X) Flood:** (3 tweetlik kısa, vurucu bir seri)
-    Hepsini başlıklarla ayır.
-    """
+    prompt = f"Konu: {topic}. Marka: {brand}. Üslup: {tone}. LinkedIn, Instagram, Twitter için post metinleri yaz."
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
+        response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         return response.choices[0].message.content
-    except Exception as e:
-        return f"Hata: {e}"
+    except Exception as e: return f"Hata: {e}"
 
 def write_newsletter(topic, brand, tone):
-    # E-Bülten
-    prompt = f"""
-    Konu: "{topic}". Marka: {brand}. Üslup: {tone}.
-    Bu blog yazısını, mevcut müşterilere gönderilecek profesyonel bir E-Bülten formatına çevir.
-    Format: Konu Satırı, Selamlama, Giriş (Sorun), Gelişme (Çözüm), CTA (Tıklama Çağrısı).
-    Mobil uyumlu, kısa paragraflar kullan.
-    """
+    prompt = f"Konu: {topic}. Marka: {brand}. Üslup: {tone}. E-Bülten formatına çevir (Konu, Giriş, Gelişme, CTA)."
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
+        response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         return response.choices[0].message.content
-    except Exception as e:
-        return f"Hata: {e}"
+    except Exception as e: return f"Hata: {e}"
 
 def generate_seo_tags(topic, brand):
-    # SEO Künyesi
-    prompt = f"""
-    Konu: "{topic}". Marka: {brand}.
-    Bu blog yazısı için Google'ın seveceği teknik SEO etiketlerini hazırla.
-    Format:
-    1. **SEO Başlığı (Title):** (Max 60 karakter).
-    2. **Meta Açıklaması (Description):** (Max 160 karakter).
-    3. **SEO Dostu URL (Slug):** (kisa-tireli-yapida).
-    4. **Görsel Alt Etiketi:** (Anahtar kelimeli).
-    5. **Odak Anahtar Kelime:**
-    """
+    prompt = f"Konu: {topic}. Marka: {brand}. Title, Description, Slug, Alt Text, Keyword hazırla."
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
+        response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         return response.choices[0].message.content
-    except Exception as e:
-        return f"Hata: {e}"
+    except Exception as e: return f"Hata: {e}"
 
 def generate_video_script(topic, brand, tone):
-    # YENI: Video Senaryosu
-    prompt = f"""
-    Konu: "{topic}". Marka: {brand}. Üslup: {tone}.
-    
-    Bu konu hakkında Instagram Reels / TikTok / YouTube Shorts için 60 saniyelik virallik potansiyeli yüksek bir senaryo yaz.
-    
-    Tablo Formatında Olsun:
-    [Süre, Görsel Sahne, Seslendirme (Dış Ses/Konuşma), Ekrana Gelecek Yazı]
-    
-    0-5sn: Çok güçlü bir kanca (Hook) ile başla.
-    Sonunda mutlaka harekete geçirici mesaj (CTA) olsun.
-    """
+    prompt = f"Konu: {topic}. Marka: {brand}. Üslup: {tone}. 60sn Reels/TikTok senaryosu (Tablo formatında)."
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
+        response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         return response.choices[0].message.content
-    except Exception as e:
-        return f"Hata: {e}"
+    except Exception as e: return f"Hata: {e}"
 
-# 4. ANA SAYFA TASARIMI
-st.title("🚀 Yapay Zeka SEO & Sosyal Medya Paneli")
+# 4. ARAYÜZ TASARIMI
+st.title("🚀 VetraPos AI Agency Pro")
 
 col1, col2 = st.columns([1,1])
 
 with col1:
-    st.info("🕵️ **1. Adım: Analiz & Strateji**")
+    st.info("🕵️ **Analiz Merkezi**")
     
-    # Analiz Butonlari
     c1, c2 = st.columns([1,1])
-    
     if c1.button("🚀 Genel Analiz"):
-        if not marka_adi or not sektor:
-            st.error("Marka ve Sektör girin!")
-        else:
-            with st.spinner("Analiz yapılıyor..."):
-                sonuc = get_ai_suggestions(marka_adi, sektor)
-                st.markdown(sonuc)
+        if marka_adi and sektor:
+            with st.spinner("Analiz..."):
+                res = get_ai_suggestions(marka_adi, sektor)
+                st.markdown(res)
+                # PDF İndirme Butonu
+                pdf_bytes = create_pdf_report(res)
+                st.download_button("📄 PDF Raporu İndir", pdf_bytes, "analiz_raporu.pdf", "application/pdf")
+        else: st.warning("Marka girin.")
 
     if c2.button("🤖 Marka Karnesi"):
-        if not marka_adi or not sektor:
-            st.error("Marka ve Sektör girin!")
-        else:
-            with st.spinner("Marka inceleniyor..."):
-                karne = get_ai_brand_awareness(marka_adi, sektor)
-                st.info("### 📢 Marka Bilinirlik Raporu")
-                st.write(karne)
+        if marka_adi and sektor:
+            with st.spinner("İnceleniyor..."):
+                res = get_ai_brand_awareness(marka_adi, sektor)
+                st.info("Marka Raporu")
+                st.write(res)
+        else: st.warning("Marka girin.")
 
     st.markdown("---")
-    
-    # YENI: Icerik Takvimi Butonu
-    if st.button("📅 1 Aylık İçerik Takvimi Oluştur"):
-        if not marka_adi or not sektor:
-            st.error("Lütfen marka ve sektör girin!")
-        else:
-            with st.spinner("Stratejik plan hazırlanıyor..."):
-                takvim = get_content_calendar(marka_adi, sektor)
-                st.success("### 🗓️ 30 Günlük Yol Haritası")
-                st.write(takvim)
+    if st.button("📅 1 Aylık Takvim"):
+        if marka_adi and sektor:
+            with st.spinner("Planlanıyor..."):
+                st.write(get_content_calendar(marka_adi, sektor))
+        else: st.warning("Marka girin.")
 
 with col2:
-    st.success("✍️ **2. Adım: İçerik Üretimi**")
-    topic_input = st.text_area("Hangi konuyu yazalım?", placeholder="Bir başlık yapıştırın...")
+    st.success("✍️ **Üretim Merkezi**")
+    topic = st.text_area("Konu Başlığı:", placeholder="Buraya bir başlık yapıştırın...")
     
-    # 1. Satir Butonlar
+    # Görsel Üretim Kutusu
+    if st.checkbox("📸 Makale için Yapay Zeka Görseli de Üret (DALL-E 3)"):
+        generate_img = True
+    else:
+        generate_img = False
+
     b1, b2 = st.columns([1,1])
-    if b1.button("📝 Makaleyi Yaz"):
-        if len(topic_input) > 3:
-            with st.spinner("Yazılıyor..."):
-                art = write_full_article(topic_input, marka_adi, uslup)
+    if b1.button("📝 Makale Yaz"):
+        if len(topic) > 3:
+            with st.spinner("Makale yazılıyor..."):
+                art = write_full_article(topic, marka_adi, uslup)
                 st.markdown(art)
-                st.download_button("💾 İndir", art, file_name="makale.md")
-        else: st.warning("Konu giriniz.")
+                st.download_button("💾 İndir (MD)", art, "makale.md")
+                
+                # Görsel Üretimi
+                if generate_img:
+                    with st.spinner("Görsel çiziliyor..."):
+                        img_url = generate_image(topic)
+                        if img_url:
+                            st.image(img_url, caption="Yapay Zeka Tarafından Üretildi")
+                            st.success("Görsel Başarıyla Üretildi!")
+                        else:
+                            st.error("Görsel üretilirken hata oluştu.")
+                
+                # WordPress'e Gönder Butonu (Eğer yazı yazıldıysa çıkar)
+                if wp_url and wp_user and wp_pass:
+                    if st.button("🌐 WordPress'e Taslak Olarak Gönder"):
+                        with st.spinner("Siteye bağlanılıyor..."):
+                            sonuc = post_to_wordpress(topic, art, wp_url, wp_user, wp_pass)
+                            st.info(sonuc)
+        else: st.warning("Konu girin.")
 
     if b2.button("🏷️ SEO Künyesi"):
-        if len(topic_input) > 3:
+        if len(topic) > 3:
             with st.spinner("Etiketler..."):
-                tags = generate_seo_tags(topic_input, marka_adi)
-                st.write(tags)
-        else: st.warning("Konu giriniz.")
+                st.write(generate_seo_tags(topic, marka_adi))
 
-    st.markdown("---") # Ayirac
-
-    # 2. Satir Butonlar
+    st.markdown("---")
     b3, b4, b5 = st.columns([1,1,1])
     
-    if b3.button("📱 Sosyal Medya"):
-        if len(topic_input) > 3:
+    if b3.button("📱 Sosyal"):
+        if len(topic) > 3:
             with st.spinner("Postlar..."):
-                st.write(write_social_media_posts(topic_input, marka_adi, uslup))
-        else: st.warning("Konu giriniz.")
+                st.write(write_social_media_posts(topic, marka_adi, uslup))
 
     if b4.button("📧 E-Bülten"):
-        if len(topic_input) > 3:
+        if len(topic) > 3:
             with st.spinner("Mail..."):
-                st.write(write_newsletter(topic_input, marka_adi, uslup))
-        else: st.warning("Konu giriniz.")
+                st.write(write_newsletter(topic, marka_adi, uslup))
 
-    # YENI: Video Senaryosu Butonu
-    if b5.button("🎬 Video Script"):
-        if len(topic_input) > 3:
-            with st.spinner("Senaryo yazılıyor..."):
-                script = generate_video_script(topic_input, marka_adi, uslup)
-                st.warning("### 🎬 Reels/TikTok Senaryosu")
-                st.write(script)
-        else: st.warning("Konu giriniz.")
+    if b5.button("🎬 Video"):
+        if len(topic) > 3:
+            with st.spinner("Senaryo..."):
+                st.write(generate_video_script(topic, marka_adi, uslup))
