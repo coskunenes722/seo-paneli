@@ -57,7 +57,7 @@ st.set_page_config(page_title="VetraPos AI SEO", layout="wide")
 
 # ---------------------------------------------------------
 # ÖNEMLİ: Şifreni tırnakların içine yapıştır (sk-proj... ile başlayan)
-api_key = "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" 
+api_key = "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" 
 # ---------------------------------------------------------
 
 
