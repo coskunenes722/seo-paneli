@@ -42,36 +42,91 @@ api_key = "sk-proj-_VIL8rWK3sJ1KgGXgQE6YIvPp_hh8-Faa1zJ6FmiLRPaMUCJhZZW366CT44Ot
 client = OpenAI(api_key=api_key)
 
 # --- AI FONKSİYONLARI ---
-def get_canli_skor(marka, sektor):
-    # Yapay zekaya daha katı ve net bir talimat veriyoruz
-    prompt = f"""
-    Sen profesyonel bir dijital pazarlama denetçisisin. 
-    '{marka}' markasının '{sektor}' sektöründeki yapay zeka modelleri (ChatGPT, Claude, Perplexity) tarafından bilinirlik ve önerilme oranını analiz et.
-    
-    Lütfen şu kriterlere göre 0 ile 100 arasında bir puan ver:
-    - Marka ne kadar sık referans gösteriliyor?
-    - Sektörel sorgularda ilk 5 öneri arasında mı?
-    - Hakkındaki teknik veriler ne kadar güncel?
+import datetime
 
-    SADECE rakam olarak (örneğin: 74) cevap ver. Başka hiçbir kelime yazma.
+def get_canli_skor(marka, sektor):
+    # AI'ya markayı gerçekten araştırması için detaylı bir "Persona" veriyoruz
+    prompt = f"""
+    Sen profesyonel bir Dijital Strateji Analistisin. 
+    '{marka}' markasını '{sektor}' sektöründe, yapay zeka modellerinin (ChatGPT, Perplexity, Claude) veri setlerindeki varlığına göre analiz et.
+    
+    Aşağıdaki metriklere göre 0-100 arası bir AI GÖRÜNÜRLÜK PUANI hesapla:
+    1. Marka ismi sektörle ne kadar güçlü eşleşiyor? (0-40 puan)
+    2. Kullanıcılar 'en iyi {sektor} çözümleri' diye sorduğunda marka öneriliyor mu? (0-40 puan)
+    3. Marka hakkında güncel teknik döküman veya haber varlığı nedir? (0-20 puan)
+
+    Önemli Not: Coca-Cola gibi dev markalar 85-95 arası almalı. VetraPos gibi yeni veya niş projeler, AI tarafından henüz keşfedilme aşamasında oldukları için gerçekçi (örneğin 20-45 arası) puanlar almalı.
+    
+    SADECE rakam ver. Yanına açıklama yazma.
     """
     try:
+        # temperature=0.9 vererek her seferinde aynı (50) sonucunu vermesini engelliyoruz
         response = client.chat.completions.create(
             model="gpt-4o", 
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.7 # Her seferinde aynı 50 cevabını vermemesi için çeşitlilik ekledik
+            temperature=0.9 
         )
         res_content = response.choices[0].message.content.strip()
         
-        # İçindeki tüm rakamları bulup birleştiriyoruz
-        puan_liste = [s for s in res_content if s.isdigit()]
-        if puan_liste:
-            puan = int("".join(puan_liste))
-            # Puanın 0-100 arasında kalmasını garanti ediyoruz
-            puan = max(0, min(100, puan))
-        else:
-            puan = 50 # Hiç rakam bulunamazsa
-            
+        # Sadece rakamı çekmek için filtreleme
+        puan_str = "".join(filter(str.isdigit, res_content))
+        puan = int(puan_str) if puan_str else 50
+        
+        # Puanın 100'ü geçmediğinden emin olalım
+        puan = min(100, max(0, puan))
+
+        # VERITABANINA KAYDET (Grafik için tarih damgalı)
+        conn = sqlite3.connect('arsiv.db')
+        c = conn.cursor()
+        tarih_tam = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        c.execute("INSERT INTO skorlar (marka, puan, tarih) VALUES (?, ?, ?)", (marka, puan, tarih_tam))
+        conn.commit()
+        conn.close()
+        
+        return puan
+    except Exception as e:
+        st.error(f"Skor hatası: {e}")
+        return 50
+
+# --- DASHBOARD GÜNCELLEMESİ ---
+if nav == "📊 Dashboard":
+    st.title(f"📊 {marka_adi} Stratejik Analiz Paneli")
+    
+    # Her girişte yeni bir analiz tetikle
+    with st.spinner(f"{marka_adi} için AI verileri taranıyor..."):
+        puan = get_canli_skor(marka_adi, sektor)
+        ai_yorum = get_marka_yorumu(marka_adi, sektor)
+    
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        # Daha profesyonel renkli Gauge Chart
+        fig_gauge = go.Figure(go.Indicator(
+            mode = "gauge+number+delta",
+            value = puan,
+            delta = {'reference': 50}, # 50'ye göre değişim gösterir
+            title = {'text': "AI Bilinirlik Skoru", 'font': {'size': 24}},
+            gauge = {
+                'axis': {'range': [None, 100], 'tickwidth': 1},
+                'bar': {'color': "#1f77b4"},
+                'steps': [
+                    {'range': [0, 30], 'color': "#ff4b4b"},
+                    {'range': [30, 70], 'color': "#ffa500"},
+                    {'range': [70, 100], 'color': "#00cc96"}]}))
+        st.plotly_chart(fig_gauge, use_container_width=True)
+
+    with col2:
+        st.subheader("🤖 Yapay Zeka Gözünden Marka Analizi")
+        st.write(ai_yorum)
+        st.info(f"💡 İpucu: Bu puan, AI modellerinin '{marka_adi}' hakkındaki güncel bilgisini temsil eder.")
+
+    st.divider()
+    st.subheader("📈 Zaman İçindeki Değişim")
+    # Veritabanından geçmiş skorları çek ve çiz
+    conn = sqlite3.connect('arsiv.db')
+    df_skor = pd.read_sql(f"SELECT tarih, puan FROM skorlar WHERE marka='{marka_adi}' ORDER BY tarih ASC", conn)
+    conn.close()
+    if not df_skor.empty:
+        st.line_chart(df_skor.set_index('tarih'))            
         # Veritabanına kaydet
         tarih = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         conn = sqlite3.connect('arsiv.db')
