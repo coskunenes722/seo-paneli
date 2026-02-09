@@ -65,27 +65,10 @@ api_key = "sk-proj-GpFUq2UDjjZ3YK6pPLOglMhcuAJMxhEo7tRxRqqbm6sDqQ-rGTjGdIgt6gE8n
 client = OpenAI(api_key=api_key)
 
 # --- YENI GELISMIS FONKSIYONLAR ---
+# --- FONKSIYONLAR (DUZELTILMIS HALI) ---
+
 def get_ai_suggestions(brand, sector):
-def get_ai_brand_awareness(brand, sector):
-    prompt = f"""
-    Sen bir Yapay Zeka Denetçisisin. "{brand}" markasını {sector} sektöründe analiz et.
-    
-    Bana şu formatta kısa bir rapor ver:
-    1. **Bilinirlik Skoru:** (0 ile 100 arasında bir puan ver. Eğer marka çok yeniyse düşük ver.)
-    2. **Yapay Zeka Görüşü:** (ChatGPT olarak bu marka hakkında ne biliyorsun? Olumlu/Olumsuz/Nötr mü?)
-    3. **Eksik Gedik:** (Bu markanın yapay zekada daha iyi tanınması için hangi konularda içerik üretmesi lazım?)
-    
-    Lütfen samimi ve gerçekçi ol.
-    """
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"Hata: {e}"
-    # 3 degil, artik 5 konu oneriyoruz ve daha detayli istiyoruz
+    # 5 konu ve detayli analiz isteyen fonksiyon
     prompt = f"""
     Sen {brand} markası için {sector} sektöründe uzman bir SEO stratejistisin.
     
@@ -106,7 +89,26 @@ def get_ai_brand_awareness(brand, sector):
     except Exception as e:
         return f"Hata: {e}"
 
-def write_full_article(topic, brand):
+def get_ai_brand_awareness(brand, sector):
+    # Yeni ekledigimiz Marka Karnesi fonksiyonu
+    prompt = f"""
+    Sen bir Yapay Zeka Denetçisisin. "{brand}" markasını {sector} sektöründe analiz et.
+    
+    Bana şu formatta kısa bir rapor ver:
+    1. **Bilinirlik Skoru:** (0 ile 100 arasında bir puan ver. Eğer marka çok yeniyse düşük ver.)
+    2. **Yapay Zeka Görüşü:** (ChatGPT olarak bu marka hakkında ne biliyorsun? Olumlu/Olumsuz/Nötr mü?)
+    3. **Eksik Gedik:** (Bu markanın yapay zekada daha iyi tanınması için hangi konularda içerik üretmesi lazım?)
+    
+    Lütfen samimi ve gerçekçi ol.
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Hata: {e}"def write_full_article(topic, brand):
     # Makale yazma kismi ayni kalsin, guzel calisiyor
     prompt = f"Konu: {topic}. Marka: {brand}. 600 kelimelik teknik, tablolu, Schema kodlu, SEO uyumlu makale yaz."
     try:
