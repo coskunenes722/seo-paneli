@@ -80,18 +80,62 @@ with st.sidebar:
         st.session_state["giris_yapildi"] = False
         st.rerun()
 
-# --- 1. DASHBOARD ---
+# --- DASHBOARD MODÜLÜ (PROFESYONEL VERSİYON) ---
 if nav == "📊 Dashboard":
-    st.title("📊 Marka Görünürlük Dashboard")
-    puan = get_canli_skor(marka_adi, sektor_adi)
-    st.metric("AI Bilinirlik Skoru", f"{puan}/100")
+    st.title(f"📊 {marka_adi} Stratejik Performans Paneli")
     
-    conn = sqlite3.connect('arsiv.db')
-    df = pd.read_sql(f"SELECT tarih, puan FROM skorlar WHERE marka='{marka_adi}'", conn)
-    if not df.empty:
-        st.line_chart(df.set_index('tarih'))
-    conn.close()
+    # 1. AI Verilerini ve Skoru Getir
+    with st.spinner("AI dünyası taranıyor ve analiz ediliyor..."):
+        current_score = get_canli_skor(marka_adi, sektor_adi)
+        ai_analizi = get_marka_yorumu(marka_adi, sektor_adi) # Marka yorumu fonksiyonu
 
+    # 2. Metrik Kartları ve Hız Göstergesi
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        # Profesyonel Hız Göstergesi (Gauge)
+        fig_gauge = go.Figure(go.Indicator(
+            mode = "gauge+number+delta",
+            value = current_score,
+            domain = {'x': [0, 1], 'y': [0, 1]},
+            title = {'text': "AI Bilinirlik Skoru", 'font': {'size': 24}},
+            delta = {'reference': 50, 'increasing': {'color': "green"}},
+            gauge = {
+                'axis': {'range': [None, 100], 'tickwidth': 1},
+                'bar': {'color': "darkblue"},
+                'steps': [
+                    {'range': [0, 40], 'color': "#ff4b4b"},
+                    {'range': [40, 75], 'color': "#ffa500"},
+                    {'range': [75, 100], 'color': "#00cc96"}],
+                'threshold': {
+                    'line': {'color': "black", 'width': 4},
+                    'thickness': 0.75,
+                    'value': 90}}))
+        st.plotly_chart(fig_gauge, use_container_width=True)
+
+    with col2:
+        st.subheader("🤖 Yapay Zeka Yönetici Özeti")
+        st.success(ai_analizi)
+        
+        # Hızlı Bilgi Kartları
+        m1, m2 = st.columns(2)
+        conn = sqlite3.connect('arsiv.db')
+        toplam = pd.read_sql(f"SELECT COUNT(*) FROM icerikler WHERE marka='{marka_adi}'", conn).values[0][0]
+        m1.metric("Toplam Üretilen İçerik", toplam)
+        m2.metric("Pazar Konumu", "Yükseliyor 🚀")
+        conn.close()
+
+    st.divider()
+
+    # 3. Gelişim Grafiği
+    st.subheader("📈 AI Görünürlük Trendi")
+    conn = sqlite3.connect('arsiv.db')
+    df_trend = pd.read_sql(f"SELECT tarih, puan FROM skorlar WHERE marka='{marka_adi}' ORDER BY tarih ASC", conn)
+    if not df_trend.empty:
+        st.line_chart(df_trend.set_index('tarih'))
+    else:
+        st.info("Veriler toplandıkça gelişim grafiği burada şekillenecek.")
+    conn.close()
 # --- 2. RAKİP TARAYICI ---
 elif nav == "🕵️ Rakip Tarayıcı":
     st.title("🕵️ Rakip Site Tarayıcı")
