@@ -166,22 +166,90 @@ elif nav == "🕵️ Rakip Tarayıcı":
         st.info(f"{r_url} analiz ediliyor...")
 
 # --- 3. İÇERİK ÜRETİMİ ---
-elif nav == "✍️ İçerik Üretimi":
-    st.title("✍️ 360° İçerik Fabrikası")
-    topic = st.text_input("Konu Başlığı")
-    if st.button("🚀 İçerik Paketini Hazırla"):
-        with st.spinner("Üretiliyor..."):
-            prompt = f"Konu: {topic}. Lütfen ###BLOG###, ###SOSYAL###, ###BULTEN### başlıklarıyla içerik yaz."
-            full_res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
-            
-            # İçeriği parçala ve sekmelere dağıt
-            tab1, tab2, tab3 = st.tabs(["📝 Blog", "📱 Sosyal", "📧 Bülten"])
-            with tab1: st.markdown(full_res)
-            
-            # Kaydetme hatasını düzelten satır
-            icerik_kaydet(st.session_state["aktif_kullanici"], marka_adi, topic, full_res, tip="Tam Paket")
-            st.success("Arşive kaydedildi!")
+# --- 3. İÇERİK FABRİKASI (PROFESYONEL 360° VERSİYON) ---
+elif nav == "✍️ İçerik Üretimi": # Sidebar menü adıyla aynı olmalı
+    st.title("🚀 360° İçerik & Görsel Fabrikası")
+    st.markdown("---")
 
+    # 1. AYARLAR PANELİ
+    with st.container():
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            topic = st.text_input("📝 Ana Konu Başlığı", placeholder="Örn: Restoranlar için Sanal POS Avantajları")
+        with c2:
+            target_tone = st.selectbox("🎭 İçerik Üslubu", ["Kurumsal", "Samimi", "Teknik", "Satış Odaklı"])
+
+    # Görsel Üretim ve Platform Seçimi
+    col_a, col_b = st.columns([1, 1])
+    with col_a:
+        gen_image = st.toggle("🖼️ Yapay Zeka Görseli Üret (DALL-E 3)", value=True)
+    
+    st.divider()
+
+    # 2. ÜRETİM BUTONU VE MANTIK
+    if st.button("🌟 Tüm İçerik Paketini Hazırla", use_container_width=True):
+        if not topic:
+            st.error("Lütfen bir konu başlığı girin!")
+        else:
+            with st.spinner("AI Fabrikası tüm platformlar için içerik ve görsel üretiyor..."):
+                # Metin Üretimi
+                prompt = f"""
+                Konu: {topic}
+                Marka: {marka_adi}
+                Lütfen içeriği tam olarak şu işaretleyicileri kullanarak yaz:
+                ###BLOG###
+                (SEO uyumlu makale, başlık ve meta açıklama)
+                ###SOSYAL###
+                (LinkedIn postu ve Instagram açıklaması)
+                ###BULTEN###
+                (E-bülten taslağı)
+                ###VIDEO###
+                (60 sn Reels/TikTok senaryosu)
+                """
+                
+                try:
+                    response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+                    
+                    # Görsel Üretimi
+                    img_url = None
+                    if gen_image:
+                        img_res = client.images.generate(model="dall-e-3", prompt=f"Modern, high-quality digital marketing visual for: {topic}", n=1)
+                        img_url = img_res.data[0].url
+
+                    # İçeriği Parçalara Ayırma
+                    parts = response.split("###")
+                    blog, sosyal, bulten, video = "", "", "", ""
+                    for p in parts:
+                        if "BLOG" in p: blog = p.replace("BLOG", "").strip()
+                        if "SOSYAL" in p: sosyal = p.replace("SOSYAL", "").strip()
+                        if "BULTEN" in p: bulten = p.replace("BULTEN", "").strip()
+                        if "VIDEO" in p: video = p.replace("VIDEO", "").strip()
+
+                    # 3. GÖRSEL ARAYÜZ (SEKMELER)
+                    tab1, tab2, tab3, tab4 = st.tabs(["📄 Blog & SEO", "📱 Sosyal Medya", "📧 E-Bülten", "🎬 Video/Reels"])
+                    
+                    with tab1:
+                        if img_url: st.image(img_url, caption=f"{topic} Kapak Görseli", use_container_width=True)
+                        st.markdown(blog if blog else response)
+                        # Kayıt fonksiyonu (Hata almamak için icerik_kaydet fonksiyonun kodda yukarıda tanımlı olmalı)
+                        icerik_kaydet(st.session_state["aktif_kullanici"], marka_adi, topic, blog, tip="Blog")
+
+                    with tab2:
+                        st.subheader("📱 Sosyal Medya Kanalları")
+                        st.info("LinkedIn ve Instagram için hazır metinleriniz:")
+                        st.write(sosyal)
+
+                    with tab3:
+                        st.subheader("📧 Haftalık Bülten Taslağı")
+                        st.write(bulten)
+
+                    with tab4:
+                        st.subheader("🎬 Kısa Video Senaryosu")
+                        st.success("Bu metni bir teleprompter yardımıyla okuyabilirsiniz.")
+                        st.markdown(video)
+                
+                except Exception as e:
+                    st.error(f"Üretim sırasında bir hata oluştu: {e}")
 # --- 4. ARŞİV ---
 elif nav == "📜 Arşiv":
     st.title("📜 İçerik Arşivi")
