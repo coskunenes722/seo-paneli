@@ -110,22 +110,12 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.info("🕵️‍♂️ **1. Adım: Konu Bul**")
-    if st.button("Fikir Üret"):
-        # --- YENI BUTON KODU ---
+   # Satır 113 civarı böyle başlamalı:
 if st.button("🚀 Detaylı SEO Analizi Yap"):
     if not marka_adi or not sektor:
         st.error("Lütfen marka ve sektör bilgisini girin!")
     else:
-        with st.spinner(f"{marka_adi} için rakipler analiz ediliyor, anahtar kelimeler bulunuyor..."):
-            # Yeni fonksiyonu cagiriyoruz
-            sonuc = get_ai_suggestions(marka_adi, sektor)
-            
-            # Sonuclari ekrana yazdiriyoruz
-            st.markdown("### 📊 Yapay Zeka SEO Raporu")
-            st.write(sonuc)
-            
-            st.success("Analiz tamamlandı! Şimdi aşağıdan bir konu seçip makale yazdırabilirsin.")
-with col2:
+        # ... diğer kodlar ...with col2:
     st.success("✍️ **2. Adım: Makale Yaz**")
     topic_input = st.text_area("Hangi konuyu yazalım?", placeholder="Soldan bir başlık kopyala...")
     
