@@ -92,8 +92,8 @@ st.title("🚀 Yapay Zeka SEO Paneli")
 
 # Sol Menü
 st.sidebar.header("⚙️ Ayarlar")
-brand_name = st.sidebar.text_input("Marka Adı", value="VetraPos")
-sector_name = st.sidebar.text_input("Sektör", value="POS Sistemleri")
+marka_adi = st.sidebar.text_input("Marka Adı", value="")
+sektor = st.sidebar.text_input("Sektör", value="")
 
 # Ana Ekran
 col1, col2 = st.columns(2)
