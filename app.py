@@ -80,54 +80,76 @@ with st.sidebar:
         st.session_state["giris_yapildi"] = False
         st.rerun()
 
-# --- DASHBOARD MODÜLÜ (PROFESYONEL VERSİYON) ---
+# --- ZEKA FONKSİYONLARI (Eksik fonksiyonlar eklendi) ---
+
+def get_marka_yorumu(marka, sektor):
+    # Bu fonksiyon Dashboard'daki analiz özetini üretir
+    prompt = f"Yapay zeka modelleri şu an {marka} markasını {sektor} sektöründe nasıl görüyor? 3 maddelik kısa bir stratejik özet ver."
+    try:
+        res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+        return res
+    except:
+        return "Analiz şu an yapılamıyor, lütfen daha sonra tekrar deneyin."
+
+def get_canli_skor(marka, sektor):
+    try:
+        prompt = f"{marka} markasının {sektor} sektöründeki AI görünürlük puanını (0-100) sadece rakam olarak ver."
+        res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+        puan = int(''.join(filter(str.isdigit, res)))
+        tarih = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        conn = sqlite3.connect('arsiv.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO skorlar (marka, puan, tarih) VALUES (?, ?, ?)", (marka, puan, tarih))
+        conn.commit()
+        conn.close()
+        return puan
+    except:
+        return 50
+
+# --- 1. DASHBOARD (PROFESYONEL VERSİYON) ---
 if nav == "📊 Dashboard":
     st.title(f"📊 {marka_adi} Stratejik Performans Paneli")
     
-    # 1. AI Verilerini ve Skoru Getir
-    with st.spinner("AI dünyası taranıyor ve analiz ediliyor..."):
-        current_score = get_canli_skor(marka_adi, sektor_adi)
-        ai_analizi = get_marka_yorumu(marka_adi, sektor_adi) # Marka yorumu fonksiyonu
-
-    # 2. Metrik Kartları ve Hız Göstergesi
+    with st.spinner("AI verileri analiz ediliyor..."):
+        puan = get_canli_skor(marka_adi, sektor_adi)
+        yorum = get_marka_yorumu(marka_adi, sektor_adi)
+    
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        # Profesyonel Hız Göstergesi (Gauge)
-        fig_gauge = go.Figure(go.Indicator(
-            mode = "gauge+number+delta",
-            value = current_score,
-            domain = {'x': [0, 1], 'y': [0, 1]},
-            title = {'text': "AI Bilinirlik Skoru", 'font': {'size': 24}},
-            delta = {'reference': 50, 'increasing': {'color': "green"}},
+        # Profesyonel Hız Göstergesi (Gauge Chart)
+        fig = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = puan,
+            title = {'text': "AI Görünürlük Skoru", 'font': {'size': 24}},
             gauge = {
                 'axis': {'range': [None, 100], 'tickwidth': 1},
                 'bar': {'color': "darkblue"},
-                'steps': [
+                'steps' : [
                     {'range': [0, 40], 'color': "#ff4b4b"},
                     {'range': [40, 75], 'color': "#ffa500"},
-                    {'range': [75, 100], 'color': "#00cc96"}],
-                'threshold': {
-                    'line': {'color': "black", 'width': 4},
-                    'thickness': 0.75,
-                    'value': 90}}))
-        st.plotly_chart(fig_gauge, use_container_width=True)
+                    {'range': [75, 100], 'color': "#00cc96"}]}))
+        st.plotly_chart(fig, use_container_width=True)
 
     with col2:
-        st.subheader("🤖 Yapay Zeka Yönetici Özeti")
-        st.success(ai_analizi)
+        st.subheader("🤖 Yapay Zeka Strateji Özeti")
+        st.success(yorum)
         
-        # Hızlı Bilgi Kartları
+        # Metrik Kartları
         m1, m2 = st.columns(2)
         conn = sqlite3.connect('arsiv.db')
-        toplam = pd.read_sql(f"SELECT COUNT(*) FROM icerikler WHERE marka='{marka_adi}'", conn).values[0][0]
-        m1.metric("Toplam Üretilen İçerik", toplam)
-        m2.metric("Pazar Konumu", "Yükseliyor 🚀")
+        toplam_icerik = pd.read_sql(f"SELECT COUNT(*) FROM icerikler WHERE marka='{marka_adi}'", conn).values[0][0]
+        m1.metric("Toplam İçerik", toplam_icerik)
+        m2.metric("Durum", "Yükseliyor 🚀")
         conn.close()
 
     st.divider()
-
-    # 3. Gelişim Grafiği
+    st.subheader("📈 Skor Gelişim Trendi")
+    conn = sqlite3.connect('arsiv.db')
+    df_trend = pd.read_sql(f"SELECT tarih, puan FROM skorlar WHERE marka='{marka_adi}' ORDER BY tarih ASC", conn)
+    if not df_trend.empty:
+        st.line_chart(df_trend.set_index('tarih'))
+    conn.close()    # 3. Gelişim Grafiği
     st.subheader("📈 AI Görünürlük Trendi")
     conn = sqlite3.connect('arsiv.db')
     df_trend = pd.read_sql(f"SELECT tarih, puan FROM skorlar WHERE marka='{marka_adi}' ORDER BY tarih ASC", conn)
