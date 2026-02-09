@@ -3,11 +3,12 @@ from openai import OpenAI
 import time
 import sqlite3
 import pandas as pd
+import plotly.graph_objects as go # Gelişmiş grafikler için
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="VetraPos AI Ultimate SaaS", layout="wide", page_icon="🚀")
+st.set_page_config(page_title="VetraPos AI Ultimate", layout="wide", page_icon="🚀")
 
-# --- VERITABANI HAZIRLIGI ---
+# --- VERİTABANI ---
 def init_db():
     conn = sqlite3.connect('arsiv.db')
     c = conn.cursor()
@@ -40,52 +41,93 @@ if not st.session_state["giris_yapildi"]:
 api_key = "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" 
 client = OpenAI(api_key=api_key)
 
-# --- AI MODÜLLERİ ---
-def get_rakip_analizi(url, marka):
-    # Bu fonksiyon artik URL'yi daha derinlemesine analiz eder
-    prompt = f"""
-    Aşağıdaki rakip web sitesini analiz et: {url}
-    Bu sitenin odaklandığı anahtar kelimeleri ve içerik stratejisini (simüle ederek) belirle.
-    Ardından {marka} markası için bu rakipte olmayan ama SEO'da bizi öne çıkaracak 3 benzersiz içerik başlığı ve stratejisi öner.
-    Lütfen sonuçları Markdown formatında, başlıklarla ver.
-    """
+# --- AI FONKSİYONLARI ---
+def get_canli_skor(marka, sektor):
+    prompt = f"{marka} markasının {sektor} sektöründeki AI bilinirlik puanını (0-100) sadece rakam olarak ver."
+    res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
     try:
-        res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
-        return res.choices[0].message.content
-    except Exception as e:
-        return f"Analiz sırasında bir hata oluştu: {e}"
+        puan = int(''.join(filter(str.isdigit, res)))
+        tarih = time.strftime('%Y-%m-%d')
+        conn = sqlite3.connect('arsiv.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO skorlar (marka, puan, tarih) VALUES (?, ?, ?)", (marka, puan, tarih))
+        conn.commit()
+        conn.close()
+        return puan
+    except: return 50
 
-# --- ARAYÜZ ---
+def get_marka_yorumu(marka, sektor):
+    prompt = f"Yapay zeka modelleri şu an {marka} markasını {sektor} sektöründe nasıl görüyor? 3 maddelik çok kısa bir özet ver."
+    return client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+
+# --- ARAYÜZ (SIDEBAR) ---
 with st.sidebar:
     st.title(f"👋 {st.session_state['aktif_kullanici']}")
     marka_adi = st.text_input("Markanız", "VetraPos")
     sektor = st.text_input("Sektör", "Sanal POS")
-    rakip_url = st.text_input("Rakip Site URL (https:// dahil)") # URL girişi
     st.divider()
-    nav = st.radio("Menü", ["📊 Dashboard", "🕵️ Rakip Tarayıcı", "✍️ İçerik Üretimi", "📅 Planlayıcı", "📜 Arşiv"])
+    nav = st.radio("Menü", ["📊 Dashboard", "🕵️ Rakip Tarayıcı", "✍️ İçerik Üretimi", "📜 Arşiv"])
     if st.button("Güvenli Çıkış"):
         st.session_state["giris_yapildi"] = False
         st.rerun()
 
-# --- 1. DASHBOARD ---
+# --- 1. DASHBOARD (CANLI VERİLER) ---
 if nav == "📊 Dashboard":
-    st.title("📊 Marka Görünürlük Dashboard")
-    st.info(f"{marka_adi} markası için güncel veriler aşağıdadır.")
-    # (Buraya daha önce yaptığımız grafik kodlarını ekleyebilirsin)
-
-# --- 2. RAKİP TARAYICI (BURASI ÖNEMLİ) ---
-elif nav == "🕵️ Rakip Tarayıcı":
-    st.title("🕵️ Rakip Site Tarayıcı & Analiz")
-    st.markdown(f"**Analiz Edilecek Rakip:** `{rakip_url if rakip_url else 'Henüz URL girilmedi'}`")
+    st.title(f"📊 {marka_adi} Performans Dashboard")
     
-    if st.button("Analizi Başlat"):
-        if not rakip_url:
-            st.error("Lütfen sol menüdeki 'Rakip Site URL' kısmına geçerli bir link girin.")
+    with st.spinner("Canlı veriler analiz ediliyor..."):
+        current_score = get_canli_skor(marka_adi, sektor)
+        ai_yorum = get_marka_yorumu(marka_adi, sektor)
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        # Hız Göstergesi (Gauge Chart)
+        fig_gauge = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = current_score,
+            title = {'text': "AI Bilinirlik Skoru"},
+            gauge = {'axis': {'range': [None, 100]},
+                     'bar': {'color': "darkblue"},
+                     'steps' : [
+                         {'range': [0, 40], 'color': "red"},
+                         {'range': [40, 70], 'color': "orange"},
+                         {'range': [70, 100], 'color': "green"}]}))
+        st.plotly_chart(fig_gauge, use_container_width=True)
+        
+    with col2:
+        st.subheader("🤖 Yapay Zeka Bilinirlik Raporu")
+        st.success(ai_yorum)
+        
+    st.divider()
+    
+    # Zaman Çizelgesi (Line Chart)
+    st.subheader("📈 Skor Gelişim Trendi")
+    conn = sqlite3.connect('arsiv.db')
+    df_skor = pd.read_sql(f"SELECT tarih, puan FROM skorlar WHERE marka='{marka_adi}' ORDER BY tarih ASC", conn)
+    conn.close()
+    
+    if not df_skor.empty:
+        st.line_chart(df_skor.set_index('tarih'))
+    else:
+        st.info("Veriler toplandıkça gelişim grafiği burada oluşacak.")
+
+# --- 2. RAKİP TARAYICI (ÖZEL ALAN) ---
+elif nav == "🕵️ Rakip Tarayıcı":
+    st.title("🕵️ Rakip Site Tarayıcı")
+    st.info("Analiz etmek istediğiniz rakip sitenin URL'sini aşağıya girin.")
+    
+    # URL kutusu artık sadece burada
+    r_url = st.text_input("Rakip Site URL (https://...)", placeholder="Örn: https://www.rakipsite.com")
+    
+    if st.button("Rakibi Analiz Et ve Boşlukları Bul"):
+        if r_url:
+            with st.spinner(f"{r_url} taranıyor..."):
+                prompt = f"{r_url} rakibini analiz et ve {marka_adi} için strateji üret."
+                res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+                st.markdown(res)
         else:
-            with st.spinner(f"{rakip_url} taranıyor ve strateji üretiliyor..."):
-                analiz_sonucu = get_rakip_analizi(rakip_url, marka_adi)
-                st.markdown("### 📈 Stratejik Analiz Sonucu")
-                st.markdown(analiz_sonucu)
+            st.warning("Lütfen bir URL girin.")
 
 # --- 3. İÇERİK ÜRETİMİ ---
 elif nav == "✍️ İçerik Üretimi":
@@ -93,6 +135,6 @@ elif nav == "✍️ İçerik Üretimi":
     konu = st.text_input("Konu nedir?")
     if st.button("Üret ve Kaydet"):
         with st.spinner("Yazılıyor..."):
-            res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": f"{konu} konusunda blog yaz."}]).choices[0].message.content
+            res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": f"{konu} blog yaz."}]).choices[0].message.content
             st.markdown(res)
-            st.success("İçerik arşive kaydedildi!")
+            # Kaydetme fonksiyonu buraya eklenebilir
