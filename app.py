@@ -3,7 +3,7 @@ from openai import OpenAI
 import time
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="VetraPos AI SEO", layout="wide")
+st.set_page_config(page_title="VetraPos AI Agency", layout="wide")
 
 # --- PROFESYONEL GIRIS SISTEMI ---
 KULLANICILAR = {
@@ -61,7 +61,7 @@ with st.sidebar:
     marka_adi = st.text_input("Marka Adı", value="")
     sektor = st.text_input("Sektör", value="")
     
-    # YENI OZELLIK: Üslup Seçimi
+    # Üslup Seçimi
     uslup = st.selectbox(
         "Marka Dili (Üslup)", 
         ["Kurumsal ve Profesyonel", "Samimi ve Eğlenceli", "Bilimsel ve Teknik", "İkna Edici ve Satış Odaklı"]
@@ -72,7 +72,7 @@ with st.sidebar:
 # 3. YAPAY ZEKA FONKSIYONLARI
 
 def get_ai_suggestions(brand, sector):
-    # 5 Konu + Anahtar Kelime + Rakip Analizi
+    # Analiz Fonksiyonu
     prompt = f"""
     Sen {brand} markası için {sector} sektöründe uzman bir SEO stratejistisin.
     Lütfen şu 3 başlık altında detaylı bir analiz yap:
@@ -111,7 +111,7 @@ def get_ai_brand_awareness(brand, sector):
         return f"Hata: {e}"
 
 def write_full_article(topic, brand, tone):
-    # Makale Yazari (Üslup destekli)
+    # Makale Yazari
     prompt = f"""
     Konu: {topic}. Marka: {brand}. 
     Dil ve Üslup: {tone} bir dille yazılacak.
@@ -134,7 +134,7 @@ def write_full_article(topic, brand, tone):
         return f"Hata: {e}"
 
 def write_social_media_posts(topic, brand, tone):
-    # Yeni Özellik: Sosyal Medya Paketi
+    # Sosyal Medya Paketi
     prompt = f"""
     Konu: "{topic}". Marka: {brand}. Üslup: {tone}.
     Bu blog yazısını tanıtmak için 3 farklı platforma içerik hazırla:
@@ -153,20 +153,33 @@ def write_social_media_posts(topic, brand, tone):
         return f"Hata: {e}"
 
 def write_newsletter(topic, brand, tone):
-    # Yeni Özellik: E-Bülten Modülü
+    # E-Bülten Modülü
     prompt = f"""
     Konu: "{topic}". Marka: {brand}. Üslup: {tone}.
-    
-    Bu blog yazısını, mevcut müşterilere gönderilecek profesyonel bir E-Bülten (Email Newsletter) formatına çevir.
-    
-    Format Şöyle Olsun:
-    1. **Konu Satırı:** (İlgi çekici, tıklanma oranı yüksek bir başlık)
-    2. **Selamlama:** (Kişiselleştirilmiş giriş)
-    3. **Giriş:** (Sorunu tanımla)
-    4. **Gelişme:** (Blog yazısındaki çözümün özeti)
-    5. **Çağrı (CTA):** (Ürünü denemeye veya blog yazısının tamamını okumaya yönlendir)
-    
-    Lütfen kısa, net ve mobil uyumlu paragraflar kullan.
+    Bu blog yazısını, mevcut müşterilere gönderilecek profesyonel bir E-Bülten formatına çevir.
+    Format: Konu Satırı, Selamlama, Giriş (Sorun), Gelişme (Çözüm), CTA (Tıklama Çağrısı).
+    Mobil uyumlu, kısa paragraflar kullan.
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Hata: {e}"
+
+def generate_seo_tags(topic, brand):
+    # Teknik SEO Künyesi
+    prompt = f"""
+    Konu: "{topic}". Marka: {brand}.
+    Bu blog yazısı için Google'ın seveceği teknik SEO etiketlerini hazırla.
+    Format:
+    1. **SEO Başlığı (Title):** (Max 60 karakter).
+    2. **Meta Açıklaması (Description):** (Max 160 karakter).
+    3. **SEO Dostu URL (Slug):** (kisa-tireli-yapida).
+    4. **Görsel Alt Etiketi:** (Anahtar kelimeli).
+    5. **Odak Anahtar Kelime:**
     """
     try:
         response = client.chat.completions.create(
@@ -212,7 +225,7 @@ with col2:
     st.success("✍️ **2. Adım: İçerik Üretimi**")
     topic_input = st.text_area("Hangi konuyu yazalım?", placeholder="Soldaki analizden bir başlık kopyalayıp buraya yapıştırın...")
     
-  # 4 butonu yan yana diziyoruz (Makale, Sosyal, Mail, SEO Künye)
+    # 4 butonu yan yana diziyoruz
     b1, b2, b3, b4 = st.columns([1,1,1,1])
     
     if b1.button("Makaleyi Yaz"):
@@ -251,25 +264,3 @@ with col2:
                 tags = generate_seo_tags(topic_input, marka_adi)
                 st.warning("### 🏷️ Teknik SEO Ayarları")
                 st.write(tags)
-def generate_seo_tags(topic, brand):
-    # Yeni Özellik: Teknik SEO Künyesi
-    prompt = f"""
-    Konu: "{topic}". Marka: {brand}.
-    
-    Bu blog yazısı için Google'ın seveceği teknik SEO etiketlerini hazırla.
-    
-    Format Şöyle Olsun:
-    1. **SEO Başlığı (Title):** (Maksimum 60 karakter, ilgi çekici ve anahtar kelime odaklı).
-    2. **Meta Açıklaması (Description):** (Maksimum 160 karakter, tıklamaya teşvik eden özet).
-    3. **SEO Dostu URL (Slug):** (Türkçe karakter içermeyen, kısa, tire ile ayrılmış link yapısı).
-    4. **Görsel Alt Etiketi (Alt Text):** (Görseli tarif eden anahtar kelimeli cümle).
-    5. **Odak Anahtar Kelime:** (Yazının hedeflediği ana kelime).
-    """
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"Hata: {e}"
