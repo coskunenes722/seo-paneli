@@ -22,11 +22,21 @@ def init_db():
 
 init_db()
 
-# --- 3. API YAPILANDIRMASI (HATA ALMAMAK İÇİN TEK SATIRDA YAZIN) ---
+# --- 3. YARDIMCI FONKSİYONLAR ---
+def icerik_kaydet(kullanici, marka, konu, icerik, tip="Makale"):
+    conn = sqlite3.connect('arsiv.db')
+    c = conn.cursor()
+    tarih = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    c.execute("INSERT INTO icerikler (kullanici, marka, konu, icerik, tarih, tip) VALUES (?, ?, ?, ?, ?, ?)",
+              (kullanici, marka, konu, icerik, tarih, tip))
+    conn.commit()
+    conn.close()
+
+# --- 4. API YAPILANDIRMASI (HATA ALMAMAK İÇİN TEK SATIRDA YAZIN) ---
 OPENAI_KEY = "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  " 
 client = OpenAI(api_key=OPENAI_KEY)
 
-# --- 4. ZEKA FONKSİYONLARI (GERÇEKÇİ MANTIK KORUNMUŞTUR) ---
+# --- 5. ZEKA FONKSİYONLARI (GERÇEKÇİ MANTIK KORUNMUŞTUR) ---
 def analiz_yap(marka, sektor):
     try:
         # Kesin Puanlama Mantığı
@@ -52,7 +62,7 @@ def analiz_yap(marka, sektor):
     except Exception as e:
         return 50, f"Bağlantı Sorunu: {str(e)}"
 
-# --- 5. SIDEBAR ---
+# --- 6. SIDEBAR ---
 with st.sidebar:
     st.title("🛡️ Operasyon Paneli")
     marka_adi = st.text_input("Markanız", "VetraPos")
@@ -66,7 +76,7 @@ with st.sidebar:
     st.divider()
     nav = st.radio("Menü", ["📊 Dashboard", "✍️ İçerik Üretimi", "📜 Arşiv"])
 
-# --- 6. DASHBOARD ---
+# --- 7. DASHBOARD ---
 if nav == "📊 Dashboard":
     st.markdown(f"<h1 style='text-align: center; color: #1E3A8A;'>🛡️ {marka_adi} Stratejik Analiz Merkezi</h1>", unsafe_allow_html=True)
     
@@ -87,3 +97,19 @@ if nav == "📊 Dashboard":
     with c2:
         st.subheader("🤖 Gerçekçi Strateji Özeti")
         st.success(st.session_state["yorum"])
+
+# --- 8. İÇERİK ÜRETİMİ ---
+elif nav == "✍️ İçerik Üretimi":
+    st.title("🚀 360° İçerik Fabrikası")
+    topic = st.text_input("📝 Ana Konu Başlığı")
+    if st.button("🌟 Tüm İçerik Paketini Hazırla", use_container_width=True):
+        with st.spinner("AI İçerikler hazırlanıyor..."):
+            prompt = f"Konu: {topic}. Lütfen [BLOG_B]...[BLOG_S], [SOSYAL_B]...[SOSYAL_S] etiketleriyle yaz."
+            res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+            def parse(tag):
+                m = re.search(f"\[{tag}_B\](.*?)\[{tag}_S\]", res, re.DOTALL)
+                return m.group(1).strip() if m else ""
+            t1, t2 = st.tabs(["📝 Blog", "📱 Sosyal Medya"])
+            with t1: st.markdown(parse("BLOG") if parse("BLOG") else res)
+            with t2: st.markdown(parse("SOSYAL"))
+            icerik_kaydet("admin", marka_adi, topic, res, tip="Tam Paket")
