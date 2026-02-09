@@ -43,19 +43,46 @@ client = OpenAI(api_key=api_key)
 
 # --- AI FONKSİYONLARI ---
 def get_canli_skor(marka, sektor):
-    prompt = f"{marka} markasının {sektor} sektöründeki AI bilinirlik puanını (0-100) sadece rakam olarak ver."
-    res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+    # Yapay zekaya daha katı ve net bir talimat veriyoruz
+    prompt = f"""
+    Sen profesyonel bir dijital pazarlama denetçisisin. 
+    '{marka}' markasının '{sektor}' sektöründeki yapay zeka modelleri (ChatGPT, Claude, Perplexity) tarafından bilinirlik ve önerilme oranını analiz et.
+    
+    Lütfen şu kriterlere göre 0 ile 100 arasında bir puan ver:
+    - Marka ne kadar sık referans gösteriliyor?
+    - Sektörel sorgularda ilk 5 öneri arasında mı?
+    - Hakkındaki teknik veriler ne kadar güncel?
+
+    SADECE rakam olarak (örneğin: 74) cevap ver. Başka hiçbir kelime yazma.
+    """
     try:
-        puan = int(''.join(filter(str.isdigit, res)))
-        tarih = time.strftime('%Y-%m-%d')
+        response = client.chat.completions.create(
+            model="gpt-4o", 
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7 # Her seferinde aynı 50 cevabını vermemesi için çeşitlilik ekledik
+        )
+        res_content = response.choices[0].message.content.strip()
+        
+        # İçindeki tüm rakamları bulup birleştiriyoruz
+        puan_liste = [s for s in res_content if s.isdigit()]
+        if puan_liste:
+            puan = int("".join(puan_liste))
+            # Puanın 0-100 arasında kalmasını garanti ediyoruz
+            puan = max(0, min(100, puan))
+        else:
+            puan = 50 # Hiç rakam bulunamazsa
+            
+        # Veritabanına kaydet
+        tarih = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         conn = sqlite3.connect('arsiv.db')
         c = conn.cursor()
         c.execute("INSERT INTO skorlar (marka, puan, tarih) VALUES (?, ?, ?)", (marka, puan, tarih))
         conn.commit()
         conn.close()
         return puan
-    except: return 50
-
+    except Exception as e:
+        st.error(f"Skor hesaplama hatası: {e}")
+        return 50
 def get_marka_yorumu(marka, sektor):
     prompt = f"Yapay zeka modelleri şu an {marka} markasını {sektor} sektöründe nasıl görüyor? 3 maddelik çok kısa bir özet ver."
     return client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
