@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 import streamlit as st
 from openai import OpenAI
 import sqlite3
@@ -34,7 +36,7 @@ def icerik_kaydet(kullanici, marka, konu, icerik, tip="Makale"):
 
 # --- 4. API YAPILANDIRMASI ---
 # DİKKAT: Anahtarı tek satırda yazın ve tırnakla kapatın!
-OPENAI_KEY = "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"
+OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_KEY)
 
 # --- 5. ZEKA FONKSİYONLARI ---
