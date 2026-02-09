@@ -106,26 +106,32 @@ marka_adi = st.sidebar.text_input("Marka Adı", value="")
 sektor = st.sidebar.text_input("Sektör", value="")
 
 # Ana Ekran
-col1, col2 = st.columns(2)
+# --- BURADAN ASAGISINI KOPYALA VE YAPISTIR ---
+col1, col2 = st.columns([1,1])
 
 with col1:
-    st.info("🕵️‍♂️ **1. Adım: Konu Bul**")
-   # Satır 113 civarı böyle başlamalı:
-if st.button("🚀 Detaylı SEO Analizi Yap"):
-    if not marka_adi or not sektor:
-        st.error("Lütfen marka ve sektör bilgisini girin!")
-    else:
-        # ... diğer kodlar ...with col2:
+    st.info("🕵️ **1. Adım: Rakip & Kelime Analizi**")
+    if st.button("🚀 Detaylı SEO Analizi Yap"):
+        if not marka_adi or not sektor:
+            st.error("Lütfen önce sol menüden Marka ve Sektör girin!")
+        else:
+            with st.spinner("Yapay zeka rakipleri geziyor, kelimeleri topluyor..."):
+                # Analiz Fonksiyonunu cagir
+                analiz_sonucu = get_ai_suggestions(marka_adi, sektor)
+                st.markdown(analiz_sonucu)
+                st.success("Analiz bitti! Şimdi yandaki panelden makale yazdırabilirsin. 👉")
+
+with col2:
     st.success("✍️ **2. Adım: Makale Yaz**")
-    topic_input = st.text_area("Hangi konuyu yazalım?", placeholder="Soldan bir başlık kopyala...")
+    topic_input = st.text_area("Hangi konuyu yazalım?", placeholder="Soldaki analizden bir başlık kopyalayıp buraya yapıştırın...")
     
     if st.button("Makaleyi Yaz"):
-        if len(topic_input) > 5:
-            with st.spinner("Yazılıyor..."):
-                article = write_full_article(topic_input, brand_name)
+        if not topic_input or len(topic_input) < 5:
+            st.warning("Lütfen geçerli bir konu başlığı girin.")
+        else:
+            with st.spinner("Makale yazılıyor, biraz uzun sürebilir..."):
+                article = write_full_article(topic_input, marka_adi)
                 st.markdown(article)
                 
                 # İndirme Butonu
-                st.download_button("💾 İndir", article, file_name="makale.md")
-        else:
-            st.warning("Lütfen bir konu yazın.")
+                st.download_button("💾 Makaleyi İndir", article, file_name="seo-makale.md")
