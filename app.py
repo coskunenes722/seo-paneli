@@ -212,8 +212,8 @@ with col2:
     st.success("✍️ **2. Adım: İçerik Üretimi**")
     topic_input = st.text_area("Hangi konuyu yazalım?", placeholder="Soldaki analizden bir başlık kopyalayıp buraya yapıştırın...")
     
-    # Butonlari yan yana koyalim
-    b1, b2 = st.columns([1,1])
+   # 3 butonu yan yana diziyoruz
+    b1, b2, b3 = st.columns([1,1,1])
     
     if b1.button("Makaleyi Yaz"):
         if not topic_input or len(topic_input) < 5:
@@ -233,3 +233,12 @@ with col2:
                 posts = write_social_media_posts(topic_input, marka_adi, uslup)
                 st.info("### 📱 Sosyal Medya İçerikleri")
                 st.write(posts)
+
+    if b3.button("📧 E-Bülten Hazırla"):
+        if not topic_input or len(topic_input) < 5:
+            st.warning("Önce bir konu giriniz.")
+        else:
+            with st.spinner("Mail taslağı yazılıyor..."):
+                newsletter = write_newsletter(topic_input, marka_adi, uslup)
+                st.success("### 📧 E-Bülten Taslağı")
+                st.write(newsletter)
