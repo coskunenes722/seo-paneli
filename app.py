@@ -59,3 +59,61 @@ if nav == "📊 Dashboard":
     with c2:
         st.markdown("### 🗺️ Neden Bu Skoru Aldınız?")
         st.info(st.session_state["harita"])
+elif nav == "✍️ İçerik Üretimi":
+    st.markdown(f"<h1>✍️ {marka_adi} İçerik Fabrikası</h1>", unsafe_allow_html=True)
+    
+    # Dashboard'daki stratejiye erişim kontrolü
+    if "strateji" in st.session_state:
+        st.info(f"💡 **Mevcut Strateji Odağı:** {st.session_state['strateji'][:150]}...")
+        
+        # Konu ve Ton Seçimi için Kolonlar
+        c1, c2 = st.columns(2)
+        with c1:
+            icerik_konusu = st.text_input("📝 İçerik Ana Başlığı", placeholder="Örn: Sanal POS Seçerken Dikkat Edilmesi Gerekenler")
+        with c2:
+            icerik_tonu = st.selectbox("🎭 İçerik Tonu", ["Profesyonel & Kurumsal", "Samimi & Enerjik", "Teknik & Detaylı"])
+
+        if st.button("🚀 360° İçerik Paketini Hazırla", use_container_width=True):
+            if not icerik_konusu:
+                st.warning("Lütfen bir konu başlığı girin.")
+            else:
+                with st.spinner("Yapay Zeka stratejinize uygun içerikleri dokuyor..."):
+                    # Tek bir prompt ile tüm paket
+                    prompt = f"""
+                    Strateji: {st.session_state['strateji']}
+                    Konu: {icerik_konusu}
+                    Ton: {icerik_tonu}
+                    Marka: {marka_adi}
+                    
+                    Lütfen şu etiketleri kullanarak içerik üret:
+                    [BLOG_B] (Kapsamlı SEO uyumlu makale) [BLOG_S]
+                    [LINKEDIN_B] (Profesyonel network odaklı post) [LINKEDIN_S]
+                    [INSTA_B] (Dikkat çekici kısa post ve hashtagler) [INSTA_S]
+                    [MAIL_B] (Müşteriler için ilgi çekici e-bülten) [MAIL_S]
+                    """
+                    full_res = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+                    
+                    # Veriyi parçalama fonksiyonu
+                    def parse_content(tag, text):
+                        match = re.search(f"\[{tag}_B\](.*?)\[{tag}_S\]", text, re.DOTALL)
+                        return match.group(1).strip() if match else "İçerik üretilemedi."
+
+                    # PROFESYONEL SEKME YAPISI
+                    tab_blog, tab_social, tab_mail = st.tabs(["📄 SEO Blog Yazısı", "📱 Sosyal Medya", "📧 E-Bülten"])
+                    
+                    with tab_blog:
+                        st.markdown(parse_content("BLOG", full_res))
+                    
+                    with tab_social:
+                        col_l, col_i = st.columns(2)
+                        with col_l:
+                            st.subheader("🔗 LinkedIn")
+                            st.write(parse_content("LINKEDIN", full_res))
+                        with col_i:
+                            st.subheader("📸 Instagram")
+                            st.write(parse_content("INSTA", full_res))
+                            
+                    with tab_mail:
+                        st.code(parse_content("MAIL", full_res), language="markdown")
+    else:
+        st.warning("⚠️ Lütfen önce Dashboard sekmesinden 'Verileri Güncelle' butonuna basarak bir strateji oluşturun.")
