@@ -3,6 +3,63 @@ from openai import OpenAI
 import plotly.graph_objects as go
 import re
 
+# --- SEOBOT STİLİ TASARIM PAKETİ ---
+st.markdown("""
+    <style>
+    /* Arka Plan ve Genel Tema */
+    .stApp {
+        background: radial-gradient(circle at center, #0a192f 0%, #000000 100%);
+        color: #e6f1ff;
+    }
+
+    /* Sidebar (Operasyon Paneli) Tasarımı */
+    [data-testid="stSidebar"] {
+        background-color: rgba(10, 25, 47, 0.8) !important;
+        border-right: 1px solid #112240;
+    }
+
+    /* Kartlar ve Konteynerlar */
+    .stMarkdown, .stButton, div[data-testid="stVerticalBlock"] > div {
+        border-radius: 12px;
+    }
+
+    /* Seobot Tarzı Terminal Bilgi Kutusu */
+    .stInfo, .stSuccess {
+        background-color: #112240 !important;
+        border: 1px solid #64ffda !important;
+        color: #64ffda !important;
+        font-family: 'Courier New', Courier, monospace;
+    }
+
+    /* Buton Tasarımı (Neon Etkisi) */
+    .stButton>button {
+        background-color: transparent !important;
+        color: #64ffda !important;
+        border: 2px solid #64ffda !important;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        font-weight: bold;
+    }
+    .stButton>button:hover {
+        background-color: rgba(100, 255, 218, 0.1) !important;
+        box-shadow: 0 0 15px #64ffda;
+    }
+
+    /* Başlıklar */
+    h1, h2, h3 {
+        color: #64ffda !important;
+        text-shadow: 0 0 10px rgba(100, 255, 218, 0.3);
+    }
+    
+    /* Input Alanları */
+    .stTextInput>div>div>input {
+        background-color: #020c1b !important;
+        color: #64ffda !important;
+        border: 1px solid #233554 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # --- API YAPILANDIRMASI ---
 OPENAI_KEY = "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"
 client = OpenAI(api_key=OPENAI_KEY)
